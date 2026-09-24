@@ -45,15 +45,31 @@ async function settle(page) {
   );
 }
 
-async function forceState(page, state, ticks) {
+async function forceState(page, state, ticks, opponentRole) {
   await page.evaluate(
-    ({ state, ticks }) => {
+    ({ state, ticks, opponentRole }) => {
       const fight = window.__fightDebug;
       fight.restart();
-      fight.forceFighter(0, { x: -1.35, z: 0, state, ticks, attackHeld: false, hitDone: false });
-      fight.forceFighter(1, { x: 1.35, z: 0, state, ticks, attackHeld: false, hitDone: false });
+      fight.forceFighter(0, {
+        role: opponentRole === "franklin" ? "franklin" : "warburg",
+        x: -1.35,
+        z: 0,
+        state,
+        ticks,
+        attackHeld: false,
+        hitDone: false,
+      });
+      fight.forceFighter(1, {
+        role: opponentRole === "franklin" ? "warburg" : "curie",
+        x: 1.35,
+        z: 0,
+        state,
+        ticks,
+        attackHeld: false,
+        hitDone: false,
+      });
     },
-    { state, ticks },
+    { state, ticks, opponentRole },
   );
   await settle(page);
   // Animation groups run independently of the paused debug simulation. This
@@ -62,8 +78,41 @@ async function forceState(page, state, ticks) {
   await settle(page);
 }
 
+async function captureCurieSeparationStep(page, directory) {
+  await page.evaluate(() => {
+    const fight = window.__fightDebug;
+    fight.restart();
+    fight.forceFighter(0, {
+      role: "curie",
+      x: -1.35,
+      z: 0,
+      state: "light",
+      ticks: 19,
+      attackHeld: true,
+      hitDone: false,
+      separationStep: true,
+      separationStepCooldown: 67,
+    });
+  });
+  await settle(page);
+  await page.waitForTimeout(300);
+  await settle(page);
+  const cue = await page.evaluate(() => ({
+    hidden: document.querySelector("#curie-indicator")?.hidden,
+    label: document.querySelector("#curie-indicator")?.textContent?.trim(),
+    width: document.querySelector("#curie-meter-fill")?.style.width,
+  }));
+  assert(!cue.hidden, "Separation Step capture did not show Curie research cue");
+  assert(cue.label?.includes("SEPARATION STEP"), "Separation Step capture omitted its move name");
+  assert(cue.label?.includes("FRACTION / ACTIVITY"), "Separation Step capture had wrong cue label");
+  assert(Number.parseFloat(cue.width ?? "") > 20, "Separation Step capture had no cue progress");
+  await page.screenshot({ path: resolve(directory, "curie-separation-step.png") });
+}
+
 async function main() {
   const directory = outputDirectory();
+  const opponentRole = readOption("--opponent", "curie");
+  assert(opponentRole === "curie" || opponentRole === "franklin", "Unknown opponent role");
   rmSync(directory, { force: true, recursive: true });
   mkdirSync(directory, { recursive: true });
   const browser = await chromium.launch({ headless: true });
@@ -80,7 +129,7 @@ async function main() {
       return Boolean(window.__fightDebug?.forceFighter && snapshot?.rigs?.length === 2);
     });
     for (const [state, ticks] of STATES) {
-      await forceState(page, state, ticks);
+      await forceState(page, state, ticks, opponentRole);
       const snapshot = await page.evaluate(() => window.__fightSnapshot?.());
       assert(snapshot?.fighters?.length === 2, `${state}: missing fighter snapshot`);
       assert(
@@ -91,10 +140,20 @@ async function main() {
         snapshot.rigs?.every((rig) => rig.activeClip === state && !rig.disposed),
         `${state}: visual animation did not synchronize with both fighters`,
       );
+      assert(
+        snapshot.rigs?.[0]?.fighterName ===
+          (opponentRole === "franklin" ? "Rosalind Franklin" : "Otto Heinrich Warburg") &&
+          snapshot.rigs?.[1]?.fighterName ===
+            (opponentRole === "franklin" ? "Otto Heinrich Warburg" : "Marie Curie"),
+        `${state}: expected role-resolved visual rigs did not load`,
+      );
       await page.screenshot({ path: resolve(directory, `${state}.png`) });
     }
+    if (opponentRole === "curie") await captureCurieSeparationStep(page, directory);
     assert(errors.length === 0, `browser console errors: ${errors.join(" | ")}`);
-    console.log(JSON.stringify({ directory, states: STATES.map(([state]) => state), errors }));
+    console.log(
+      JSON.stringify({ directory, opponentRole, states: STATES.map(([state]) => state), errors }),
+    );
   } finally {
     await browser.close();
   }

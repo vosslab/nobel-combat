@@ -7,7 +7,7 @@ import { NEUTRAL } from "../src/match.ts";
 const states = [
   ["idle", 0],
   ["move", 0],
-  ["light", 22],
+  ["light", 24],
   ["heavy", 36],
   ["block", 8],
   ["hit", 18],
@@ -74,4 +74,32 @@ test("debug harness rejects malformed test drivers", () => {
   assert.throws(() => harness.forceMatch({ extra: true }), /Unknown match field/);
   assert.throws(() => harness.tick([{ ...NEUTRAL, x: 1.1 }, NEUTRAL]), /Action x/);
   assert.throws(() => harness.tick([{ ...NEUTRAL, light: "yes" }, NEUTRAL]), /Action light/);
+});
+
+test("debug harness supports bounded Curie Separation Step state", () => {
+  const harness = new DebugHarness();
+  const curie = harness.forceFighter(0, {
+    role: "curie",
+    state: "light",
+    ticks: 24,
+    separationStep: true,
+    separationStepCooldown: 72,
+  });
+  assert.equal(curie.fighters[0].role, "curie");
+  assert.equal(curie.fighters[0].separationStepCooldown, 72);
+  assert.throws(
+    () => harness.forceFighter(0, { separationStepCooldown: 73 }),
+    /separationStepCooldown/,
+  );
+  assert.throws(
+    () => harness.forceFighter(0, { state: "idle", ticks: 0, separationStep: true }),
+    /Separation Step/,
+  );
+});
+
+test("debug harness accepts Franklin for direct state fixtures", () => {
+  const harness = new DebugHarness();
+  const snapshot = harness.forceFighter(0, { role: "franklin", state: "block", ticks: 0 });
+  assert.equal(snapshot.fighters[0].role, "franklin");
+  assert.equal(snapshot.fighters[0].state, "block");
 });

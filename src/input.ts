@@ -11,6 +11,16 @@ export type InputFrame = {
   restart: boolean;
 };
 
+/**
+ * Level-triggered navigation for the two-fighter selection screen. The screen
+ * owns edge detection so held controls can be given an appropriate repeat rate.
+ */
+export type SelectionInput = {
+  previous: boolean;
+  next: boolean;
+  confirm: boolean;
+};
+
 const DEAD_ZONE = 0.2;
 
 const pressed = (keys: ReadonlySet<string>, ...codes: readonly string[]): boolean =>
@@ -32,6 +42,23 @@ const unit = (x: number, z: number): Pick<Action, "x" | "z"> => {
   const scale = length > 1 ? 1 / length : 1;
   return { x: x * scale, z: z * scale };
 };
+
+/**
+ * Converts accepted keyboard controls and a standard-layout gamepad into
+ * selection navigation. It deliberately has no persistent state.
+ */
+export function mapSelectionInput(
+  keys: ReadonlySet<string>,
+  gamepad: StandardGamepadInput | null | undefined,
+): SelectionInput {
+  const horizontal = axis(gamepad, 0);
+  return {
+    previous: pressed(keys, "ArrowLeft", "KeyA") || buttonPressed(gamepad, 14) || horizontal < 0,
+    next: pressed(keys, "ArrowRight", "KeyD") || buttonPressed(gamepad, 15) || horizontal > 0,
+    confirm:
+      pressed(keys, "Enter", "Space") || buttonPressed(gamepad, 0) || buttonPressed(gamepad, 9),
+  };
+}
 
 /**
  * Converts the accepted keyboard controls and a standard-layout gamepad into one

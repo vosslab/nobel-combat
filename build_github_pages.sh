@@ -42,6 +42,7 @@ for required in \
 	src/style.css \
 	assets/models/mesh2motion_male_5.glb \
 	assets/models/mesh2motion_doctor_m.glb \
+	assets/models/mesh2motion_female_31.glb \
 	assets/animations/mesh2motion_human_base.glb \
 	assets/animations/mesh2motion_human_addon.glb; do
 	if [ ! -f "$required" ]; then
@@ -82,6 +83,7 @@ cp src/style.css dist/style.css
 mkdir -p dist/assets/models dist/assets/animations
 cp assets/models/mesh2motion_male_5.glb dist/assets/models/
 cp assets/models/mesh2motion_doctor_m.glb dist/assets/models/
+cp assets/models/mesh2motion_female_31.glb dist/assets/models/
 cp assets/animations/mesh2motion_human_base.glb dist/assets/animations/
 cp assets/animations/mesh2motion_human_addon.glb dist/assets/animations/
 touch dist/.nojekyll
@@ -90,6 +92,7 @@ test -f dist/index.html
 test -f dist/main.js
 test -s dist/assets/models/mesh2motion_male_5.glb
 test -s dist/assets/models/mesh2motion_doctor_m.glb
+test -s dist/assets/models/mesh2motion_female_31.glb
 test -s dist/assets/animations/mesh2motion_human_base.glb
 test -s dist/assets/animations/mesh2motion_human_addon.glb
 

@@ -1,5 +1,128 @@
 # Changelog
 
+## 2026-09-24
+
+### Additions and New Features
+
+- Linked the live game near the README opening with descriptive link text.
+- Added the Franklin player role against Warburg AI while retaining `warburg | curie` as the
+  Nobel-fighter vocabulary used by unlock progression. Franklin currently uses the existing
+  `female_31` rig fallback and the HUD identifies her as Rosalind Franklin; chooser unlock and
+  progression remain separate milestones.
+- Added the pure, versioned Franklin unlock reducer for wins as both Nobel player roles; browser
+  storage remains outside the reducer.
+- Mapped Franklin to the existing female_31 rig with role-resolved names and combat-state clips,
+  while retaining the asset's authored appearance and independent resources from Warburg.
+- Added a serial Playwright capture test that writes Franklin's eight combat-state screenshots to
+  the ignored `test-results/rig-states-franklin-f4/` evidence directory.
+- Added a browser regression asserting that Otto Heinrich Warburg's full name remains in both
+  player and AI HUD and accessibility labels.
+- Refit the camera to each screen-space axis and nearest-fighter depth so both rigged fighters are
+  larger during ordinary play; live browser checks require at least 20% viewport-height presence at
+  the default landscape start and preserve traversal visibility and continuity.
+
+### Behavior or Interface Changes
+
+- Kept the keyboard, camera, and gamepad control legend inside the viewport and clear of match
+  actions from 320-pixel phones through desktop widths.
+- Updated the HUD, fighter chooser, accessibility labels, and match presentation to use Otto
+  Heinrich Warburg's full name.
+- `Match.selectPlayer("franklin")` places Franklin only in the player slot, preserves the
+  Franklin-versus-Warburg pair through round reset and both restart paths, and leaves the legacy
+  Warburg-versus-opponent default unchanged.
+- Completed the F5A chooser milestone: the native chooser creates Franklin only from a
+  strict-decoder-backed local fixture, orders options Warburg, Curie, then Franklin, and keeps its
+  keyboard, D-pad, and stick navigation, focus, pause, and input-release behavior aligned. Franklin
+  help now describes the standard light/heavy/block controls without claiming Curie's move.
+- Completed the storage-free F5B presentation boundary: a private post-commit handler produces one
+  polite atomic unlock announcement only for a decoded newly unlocked record, and match-over now
+  offers `Change fighter`. It preserves a valid Curie or Franklin selection, otherwise selects
+  Warburg, pauses at the chooser, and resumes only after confirmation.
+- Completed F6A's versioned browser-storage boundary. The local adapter reads and strictly decodes
+  `nobel-combat.franklin-unlock.v1`, returns an explicit read-failure result, and writes only encoded
+  records with an explicit success result; failed storage remains locked and playable without an
+  optimistic chooser update or announcement.
+- Completed F6B's winner-edge progression boundary. Only live non-debug complete player victories
+  as Warburg or Curie can advance progress, and a changed durable write completes before application
+  state, chooser reveal, or F5B's post-commit announcement seam. AI, round, restart, repeated,
+  debug, and Franklin events cannot advance progression.
+- Completed F6C's durable browser progression scenarios. Both real full Nobel-win orders remain
+  locked after one win, unlock durably with one announcement after the second, and reload silently.
+  The existing F6A startup fixture covers denied reads; a denied write preserves the partial record,
+  leaves the session locked, and produces no unlock or browser error.
+- Completed F6D's live-role acceptance without changing production gameplay. Durable Franklin
+  selection works through keyboard and synthetic standard-gamepad input; automated matches cover
+  Franklin player and Warburg AI victories, KO and round transitions, and restart during and after
+  match-over.
+- Completed F7A secrecy/accessibility and F7B live-progression evidence. Browser scenarios verify
+  chooser/announcement selector contracts with frame waits, durable announcement behavior, and
+  production progression idempotence: AI wins preserve empty or partial progress, while a repeated
+  live Warburg win produces no write or announcement.
+- Completed F7C endurance and camera validation. Camera framing now fits a padded two-fighter
+  silhouette sphere to the narrower FOV axis; viewport fixtures wait for rendered frames after
+  resize and use fresh knockdown windows for each aspect-ratio separation trial.
+- Closed Franklin F8 with automated evidence: strict repository checks and 45/45 Node tests,
+  production build, 31/31 serial browser tests, local GLB-to-`dist` identity, local Markdown links,
+  dependency audit, and diff hygiene all passed without changing either TypeScript configuration.
+
+### Fixes and Maintenance
+
+- Kept the Franklin milestone plan's F3 reducer pure and assigned concrete browser storage reads,
+  writes, persistence, and failure behavior to F6A-F6D after independent plan review.
+
+### Developer Tests and Notes
+
+- Added a built-page Playwright regression for help layout in fight and match-over states at
+  320x568, 375x667, 768x1024, and 1280x800; text bounds, button separation, and browser errors pass.
+- Franklin F2 focused match/debug tests passed 18/18, `./check_codebase.sh` passed 30/30 Node tests
+  plus strict TypeScript, lint, and formatting, and `./build_github_pages.sh` passed. Independent
+  code review accepted F2; `tsconfig.json` and `tsconfig.lint.json` remain unchanged.
+- Franklin F3 decoder/reducer tests passed 7/7, including malformed and duplicate-key records,
+  role restrictions, idempotence, and locked/partial/unlocked round trips. Independent review
+  accepted F3; strict source TypeScript checking passed.
+- Franklin F4 presentation assertions and the automated eight-state capture passed with zero
+  browser errors; rig-boundary tests passed 3/3, the production build passed, and independent
+  review accepted F4. The integrated serial Playwright suite passed 9/9, including six live matches,
+  traversal, deterministic endurance, chooser/input parity, and captures.
+- Franklin F5A passed 37/37 repository Node tests plus strict TypeScript, lint, and formatting;
+  `./build_github_pages.sh`; and the focused five-case chooser browser suite. Independent review
+  accepted the final help-text and per-device navigation-wrap fixes; `git diff --check` passed and
+  both TypeScript configuration diffs remain empty.
+- Franklin F5B passed 37/37 repository Node tests plus strict TypeScript, lint, and formatting;
+  `./build_github_pages.sh`; and the focused seven-case chooser Playwright suite. Independent review
+  accepted the post-commit handler and debug-mode hidden-dialog reopen fix; `git diff --check`
+  passed and both TypeScript configuration diffs remain empty.
+- Franklin F6A passed 41 repository Node tests plus strict TypeScript, lint, and formatting;
+  `./build_github_pages.sh`; and a serial focused nine-case Playwright suite. Independent review
+  accepted the storage boundary; `git diff --check` passed and both TypeScript configuration diffs
+  remain empty.
+- Franklin F6B passed 45 repository Node tests plus strict TypeScript, lint, and formatting;
+  `./build_github_pages.sh`; and a focused serial 11-case Playwright suite. Independent review also
+  verified 15 focused unlock/storage/progression Node tests, both TypeScript configurations,
+  Prettier, `git diff --check`, and the 11/11 browser run.
+- Franklin F6C's deterministic seeded serial browser suite passed 14/14. `./check_codebase.sh`
+  passed 45 Node tests plus strict TypeScript, lint, and formatting; the production build, Prettier,
+  and `git diff --check` passed; both TypeScript configuration diffs remain empty. Independent review
+  accepted F6C.
+- Franklin F6D's combined serial browser suite passed 18/18, including the focused live-role suite
+  2/2. Independent review accepted the final validation with no reported page or console errors.
+- Franklin F7A's serial suite passed 5/5 and its real durable-announcement scenario passed 1/1;
+  the full repository check passed. F7B's serial production matrix passed 3/3 with strict style
+  checks. Independent reviews accepted both milestones.
+- The fresh F7C command `PW_PORT=4174 ./run_playwright_tests.sh --build
+tests/playwright/franklin_endurance.spec.ts --workers=1` passed 1/1 in 1.4 minutes; independent
+  review accepted it. Live visibility checks cover fighter center, feet, and head anchors from
+  0–2.7 m, rather than animated limb extrema; pitch/zoom endpoints are not cross-producted with
+  maximum separation.
+- Final F8 evidence: `./check_codebase.sh` passed strict typecheck, lint typecheck, ESLint,
+  Prettier, and 45/45 Node tests; `./build_github_pages.sh` passed with a 7.3 MB `dist/main.js`;
+  serial `PW_PORT=4174 ./run_playwright_tests.sh --workers=1` passed 31/31 in 8.4 minutes with no
+  page or console errors; and the F7C focused rerun passed 1/1 in 1.5 minutes. `npm audit
+--audit-level=high` reported zero vulnerabilities, Markdown links passed 39 tests, all local
+  GLBs matched `dist/`, and `git diff --check` passed. The debug camera fixture resets telemetry at
+  intentional restart snaps while live continuity remains the smoothness gate. The prior Pages
+  success belongs only to commit `ccaf03d00486d190b2dbe9d01a824da829e437f0`, not uncommitted work.
+
 ## 2026-09-23
 
 ### Additions and New Features
@@ -16,19 +139,81 @@
   `3ce7f9d97d25e608b4779ce797da343775ded62b`, with direct same-rig base and addon animation GLBs,
   as the generic fighter asset path. Provenance and SHA-256 digests are recorded in `assets/README.md`.
 - GitHub Pages reported a successful deployment for commit `ccaf03d00486d190b2dbe9d01a824da829e437f0`.
-- Started the first Nobel-fighter milestone: Otto Warburg is the signature, deliberately stronger
-  fighter; the active plan covers his local scientist model, research-based moves, and automated
+- Started the first Nobel-fighter milestone: Otto Heinrich Warburg is the signature, deliberately
+  stronger fighter; the active plan covers his local scientist model, research-based moves, and automated
   acceptance before the next roster step.
-- Integrated the vendored CC0 Mesh2Motion `doctor_m` scientist model for Otto Warburg while keeping
-  `male_5` as the independently animated AI opponent. The HUD and browser identity now name the
+- Integrated the vendored CC0 Mesh2Motion `doctor_m` scientist model for Otto Heinrich Warburg while
+  keeping `male_5` as the independently animated AI opponent. The HUD and browser identity now name the
   Warburg-versus-AI match.
 - Made Warburg's Oxygen Transfer heavy faster and stronger than the standard AI heavy, and added
   fixed-tick Lactate Drive and Aerobic Glycolysis moves with explicit cooldown and controller-chord
   rules. Combat remains independent of rendering.
+- Added presentation-only move labels, an Oxygen Transfer contact ring, and an Aerobic Glycolysis
+  output ring. Browser scenarios capture each Warburg move at deterministic combat frames.
 - Corrected hit resolution so a newly struck fighter receives the full hit-stun or knockdown duration
   regardless of fighter update order.
 - Added the complete CC0 1.0 legal text and mapped source code and vendored Mesh2Motion assets to
   their respective licenses from the root README.
+- Closed the first Nobel-fighter acceptance: all 19 repository tests pass, the Pages build succeeds,
+  the dependency audit reports zero vulnerabilities, and all five Playwright tests pass. The browser
+  suite includes six complete matches, movement/camera traversal, input parity, and a 14,760-tick
+  randomized/idle endurance scenario.
+- Captured all eight combat states and four Warburg-move moments under ignored `test-results/` paths;
+  the final browser capture and suite report no errors.
+- Started the second-Nobel-fighter plan with Marie Curie, official 1903/1911 Nobel sources, a CC0
+  female-asset feasibility milestone, minimal two-character selection, and Franklin's later secret
+  unlock handoff.
+- Completed Curie's C1-C2 asset and visual milestones with the vendored CC0 Mesh2Motion
+  `female_31` model. The live AI still uses the existing opponent combat role, while the browser
+  truthfully identifies and renders Marie Curie with independent native-rig animation clips.
+- Completed Curie's C4 combat milestone: added the direct `curie` role and its bounded Separation
+  Step `light + block` rule, with no change to the current Warburg-versus-standard-opponent default.
+- Completed Curie's C5 presentation milestone: the existing native state clips remain driven by
+  `Fighter` state, while a temporary FRACTION / ACTIVITY meter follows only authoritative Separation
+  Step ticks and clears after recovery or interruption.
+- Completed Curie's C6A-C6B role foundation: selection retains a complementary Nobel pair through
+  match resets, while rig assignment, HUD names and ARIA labels, research cues, KO text, and match
+  victory text now follow each fighter's current role in either slot.
+- Extended the localhost-only browser probe with role-resolved presentation-cue coordinates, so
+  automated C6B scenarios verify Oxygen Transfer and Aerobic Glycolysis visuals in both pair orders.
+- Added the Curie C6C pre-match chooser: accessible native radio choices for Otto Heinrich Warburg
+  and Marie Curie, a visible confirmation action, keyboard and standard-gamepad selection edges, modal focus
+  wrapping, and a paused simulation until the selected pair begins. The control summary follows the
+  selected fighter.
+- Prevented held chooser confirmation from leaking into the first gameplay tick: gamepad south no
+  longer starts a light attack and Start no longer restarts the freshly selected match before those
+  controls are released.
+- Completed Curie's C6D keyboard and synthetic-gamepad chooser parity with the existing pure input
+  mapping. Browser fixtures require no physical controller.
+- Completed Curie's C6E live pairing acceptance: the unchanged six-match matrix now confirms
+  keyboard Warburg-versus-Curie and synthetic-gamepad Curie-versus-Warburg, retaining the selected
+  roles after restart while covering both player and AI match victories without browser errors.
+- Split final acceptance into C7A repository/build checks, C7B browser acceptance, C7C
+  asset/dependency/screenshot evidence, and C7D milestone closure so each remains independently
+  dispatchable and automatically verifiable.
+- Completed C7A repository/build checks: all 28 Node tests, strict TypeScript, lint, formatting, and
+  the Pages-ready build pass; `tsconfig.json` and `tsconfig.lint.json` remain unchanged.
+- C7C dependency audit reports zero vulnerabilities, and all four vendored GLB SHA-256 hashes match
+  their production `dist/assets/` copies.
+- Closed Curie's C7B-C7D first-playable acceptance without a human or physical-hardware gate. The
+  serial production browser suite passes all eight scenarios, including deterministic endurance,
+  chooser/input parity, six keyboard and synthetic-gamepad matches, traversal/camera, KO/round,
+  match victory, and restart checks.
+- Captured Curie's idle, move, light, heavy, block, hit, down, get-up, and Separation Step states
+  under `test-results/rig-states-curie-final/`; the capture run reported zero browser errors.
+- Closed Curie's C8 handoff with the active Franklin secret-fighter plan. It records Franklin's
+  non-laureate historical framing, existing CC0 `female_31` asset provenance, a strict persistent
+  two-Nobel-win unlock, player-only Franklin-versus-Warburg pairing, accessibility, and automated
+  secrecy, input, combat, camera, and endurance evidence.
+- Clarified the Franklin implementation plan: repository link checks validate local links while
+  consulted external sources are non-gating; Franklin presentation is verified against concurrent
+  Warburg AI and Curie in its own pairing; the dynamic third choice is ordered Warburg, Curie,
+  Franklin; and storage exceptions fail closed with no optimistic unlock or announcement. The
+  unlock announcement occurs once only after the second distinct player-role victory is durably
+  written; reloading a saved unlock does not announce again.
+- Completed Franklin F1 planning evidence: the local Markdown-link checker passed 39 tests, the
+  consulted historical sources remain non-gating, and existing provenance, rig, and SHA-256
+  evidence confirms the vendored `female_31` asset contract.
 
 ### Fixes and Maintenance
 
@@ -44,6 +229,12 @@
   Mesh2Motion replacement passed all eight animation-state captures.
 - Held the keyboard restart key across simulation ticks in the six-match browser check so the
   synthetic input reflects a real key press.
+- Removed blanket material multiplication from the second fighter so Curie's authored clothing and
+  adult-human proportions render unchanged.
+- Cleared Curie's active Separation Step flag when an incoming strike causes hit stun or knockdown,
+  so presentation and combat state cannot retain an interrupted special after the fighter changes
+  state. Focused traces retain the elapsed cooldown and confirm one-hit behavior.
+- Archived the completed Warburg and Curie plans; Franklin is now the active fighter plan.
 
 ### Developer Tests and Notes
 
@@ -51,6 +242,17 @@
 - `./build_github_pages.sh`, focused combat checks, and six complete browser matches passed (three keyboard, three gamepad, including player and AI victories).
 - Browser traversal checks crossed the opponent, reached arena edges, exercised light and block, and restarted with both devices; projected fighter centers remained on screen and no page errors were reported.
 - R and gamepad Start also restarted completed matches to round one with full health and zero wins.
+- Curie's source GLB passed SHA-256 verification, 66-joint ordered-rig and animation-target checks,
+  production build, five serial browser scenarios, and eight deterministic state captures with no
+  browser errors.
+- Browser traversal now compares Babylon rig-root positions and yaw against authoritative `Match`
+  fighter state, closing the C2 position-following test gap.
+- Curie's deterministic combat tests cover Separation Step startup, active contact, block, whiff,
+  recovery, cooldown, KO, round transition, restart, and default Warburg/opponent regression.
+- `./run_playwright_tests.sh --build --workers=1` passed all eight serial browser tests. The final
+  C7 check also confirms 28 Node tests, strict TypeScript, lint, formatting, the production build,
+  a clean `git diff --check`, unchanged `tsconfig.json` and `tsconfig.lint.json`, matching source/
+  `dist` GLB SHA-256 hashes, and `npm audit --audit-level=high` with 0 vulnerabilities.
 
 ### Decisions and Failures
 
@@ -64,3 +266,7 @@
   the model and selected clips on the same rig.
 - Deferred Warburg and all other Nobel-character work until the selected generic human replacement
   passed its automated visual and gameplay checks; the next active plan now starts Warburg.
+- Physical-controller feel remains a nonblocking uncertainty. Synthetic standard Gamepad API parity
+  and measurable input, camera, movement, combat-transition, and endurance checks provide the
+  automated closure path. The successful GitHub Pages deployment remains evidence only for its
+  earlier commit `ccaf03d00486d190b2dbe9d01a824da829e437f0`, not this uncommitted local work.

@@ -1,6 +1,8 @@
 export type Action = { x: number; z: number; light: boolean; heavy: boolean; block: boolean };
 export type State = "idle" | "move" | "light" | "heavy" | "block" | "hit" | "down" | "getup";
-export type FighterRole = "warburg" | "opponent";
+export type FighterRole = "warburg" | "curie" | "franklin" | "opponent";
+export type NobelFighterRole = "warburg" | "curie";
+export type PlayerFighterRole = NobelFighterRole | "franklin";
 export type Fighter = {
   role: FighterRole;
   x: number;
@@ -17,6 +19,8 @@ export type Fighter = {
   aerobicOutputTicks: number;
   aerobicGlycolysisCooldown: number;
   aerobicLightReady: boolean;
+  separationStep: boolean;
+  separationStepCooldown: number;
 };
 export type Phase = "fight" | "roundOver" | "matchOver";
 export const NEUTRAL: Action = { x: 0, z: 0, light: false, heavy: false, block: false };
@@ -38,17 +42,42 @@ const makeFighter = (x: number, role: FighterRole): Fighter => ({
   aerobicOutputTicks: 0,
   aerobicGlycolysisCooldown: 0,
   aerobicLightReady: false,
+  separationStep: false,
+  separationStepCooldown: 0,
 });
 
 export class Match {
   fighters: [Fighter, Fighter] = [makeFighter(-3, "warburg"), makeFighter(3, "opponent")];
+  playerRole: PlayerFighterRole = "warburg";
+  private selectionActive = false;
   phase: Phase = "fight";
   round = 1;
   winner: number | null = null;
   phaseTicks = 0;
 
+  selectPlayer(role: PlayerFighterRole): void {
+    if (role !== "warburg" && role !== "curie" && role !== "franklin") {
+      throw new TypeError("Player fighter must be warburg, curie, or franklin");
+    }
+    this.playerRole = role;
+    this.selectionActive = true;
+    this.resetFighters(false);
+  }
+
   restart(): void {
-    this.fighters = [makeFighter(-3, "warburg"), makeFighter(3, "opponent")];
+    this.resetFighters(false);
+  }
+
+  private resetFighters(preserveWins: boolean): void {
+    const wins = preserveWins ? this.fighters.map((fighter) => fighter.wins) : [0, 0];
+    const aiRole: FighterRole = this.selectionActive
+      ? this.playerRole === "warburg"
+        ? "curie"
+        : "warburg"
+      : "opponent";
+    this.fighters = [makeFighter(-3, this.playerRole), makeFighter(3, aiRole)];
+    this.fighters[0].wins = wins[0] ?? 0;
+    this.fighters[1].wins = wins[1] ?? 0;
     this.phase = "fight";
     this.round = 1;
     this.winner = null;
@@ -59,13 +88,9 @@ export class Match {
     if (this.phase === "matchOver") return;
     if (this.phase === "roundOver") {
       if (++this.phaseTicks >= 120) {
-        const wins = this.fighters.map((f) => f.wins);
-        this.fighters = [makeFighter(-3, "warburg"), makeFighter(3, "opponent")];
-        this.fighters[0].wins = wins[0] ?? 0;
-        this.fighters[1].wins = wins[1] ?? 0;
-        this.round++;
-        this.phase = "fight";
-        this.phaseTicks = 0;
+        const nextRound = this.round + 1;
+        this.resetFighters(true);
+        this.round = nextRound;
       }
       return;
     }
@@ -80,6 +105,7 @@ export class Match {
       f.attackHeld = a.light || a.heavy;
       if (f.lactateDriveCooldown > 0) f.lactateDriveCooldown--;
       if (f.aerobicGlycolysisCooldown > 0) f.aerobicGlycolysisCooldown--;
+      if (f.separationStepCooldown > 0) f.separationStepCooldown--;
       const aerobicOutputActive = f.aerobicOutputTicks > 0;
       if (aerobicOutputActive) {
         f.aerobicOutputTicks--;
@@ -98,6 +124,7 @@ export class Match {
             f.state = "idle";
           }
           f.lactateDrive = false;
+          f.separationStep = false;
         }
       }
       if (f.state === "hit" || f.state === "down" || f.state === "getup") continue;
@@ -127,6 +154,16 @@ export class Match {
         }
         continue;
       }
+      if (f.role === "curie" && a.light && a.block && attack) {
+        if (f.separationStepCooldown === 0) {
+          f.state = "light";
+          f.ticks = 24;
+          f.hitDone = false;
+          f.separationStep = true;
+          f.separationStepCooldown = 72;
+        }
+        continue;
+      }
       if (a.block) {
         f.state = "block";
         continue;
@@ -136,6 +173,7 @@ export class Match {
         f.ticks = a.heavy ? (f.role === "warburg" ? 32 : 36) : 22;
         f.hitDone = false;
         f.lactateDrive = false;
+        f.separationStep = false;
         continue;
       }
       // ASVS 2.2.1: bound movement at the input boundary, then constrain it to the arena.
@@ -168,13 +206,16 @@ export class Match {
     const heavy = f.state === "heavy";
     const oxygenTransfer = heavy && f.role === "warburg";
     const lactateDrive = f.lactateDrive && f.role === "warburg";
+    const separationStep = f.separationStep && f.role === "curie";
     const active = oxygenTransfer
       ? f.ticks <= 23 && f.ticks >= 16
       : lactateDrive
         ? f.ticks <= 6 && f.ticks >= 1
-        : heavy
-          ? f.ticks <= 22 && f.ticks >= 15
-          : f.ticks <= 15 && f.ticks >= 10;
+        : separationStep
+          ? f.ticks <= 18 && f.ticks >= 12
+          : heavy
+            ? f.ticks <= 22 && f.ticks >= 15
+            : f.ticks <= 15 && f.ticks >= 10;
     if (!active) return false;
     f.hitDone = true;
     const dx = target.x - f.x;
@@ -182,7 +223,8 @@ export class Match {
     const distance = Math.hypot(dx, dz);
     const front = dx * Math.sin(f.facing) + dz * Math.cos(f.facing);
     if (
-      distance > (oxygenTransfer ? 2.45 : lactateDrive ? 2 : heavy ? 2.2 : 1.8) ||
+      distance >
+        (oxygenTransfer ? 2.45 : lactateDrive ? 2 : separationStep ? 1.95 : heavy ? 2.2 : 1.8) ||
       front < 0 ||
       target.state === "down"
     )
@@ -197,17 +239,21 @@ export class Match {
         ? blocked
           ? 4
           : 18
-        : heavy
+        : separationStep
           ? blocked
-            ? 5
-            : 24
-          : poweredLight
+            ? 3
+            : 16
+          : heavy
             ? blocked
-              ? 4
-              : 14
-            : blocked
-              ? 2
-              : 10;
+              ? 5
+              : 24
+            : poweredLight
+              ? blocked
+                ? 4
+                : 14
+              : blocked
+                ? 2
+                : 10;
     target.hp = Math.max(0, target.hp - damage);
     target.state = blocked ? "block" : heavy ? "down" : "hit";
     target.ticks = blocked
@@ -216,10 +262,13 @@ export class Match {
         ? oxygenTransfer
           ? 72
           : 70
-        : lactateDrive || poweredLight
-          ? 14
-          : 18;
+        : separationStep
+          ? 16
+          : lactateDrive || poweredLight
+            ? 14
+            : 18;
     target.lactateDrive = false;
+    target.separationStep = false;
     if (poweredLight) f.aerobicLightReady = false;
     const knockback = heavy ? 0.65 : lactateDrive ? 0.4 : 0.25;
     target.x = clamp(target.x + (dx / (distance || 1)) * knockback, -9, 9);

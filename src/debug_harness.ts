@@ -39,13 +39,15 @@ const FIGHTER_FIELDS: ReadonlySet<string> = new Set([
   "aerobicOutputTicks",
   "aerobicGlycolysisCooldown",
   "aerobicLightReady",
+  "separationStep",
+  "separationStepCooldown",
 ]);
 const MATCH_FIELDS: ReadonlySet<string> = new Set(["phase", "round", "winner", "phaseTicks"]);
 const ACTION_FIELDS: ReadonlySet<string> = new Set(["x", "z", "light", "heavy", "block"]);
 const STATE_TICK_LIMITS: Readonly<Record<State, readonly [number, number]>> = {
   idle: [0, 0],
   move: [0, 0],
-  light: [1, 22],
+  light: [1, 24],
   heavy: [1, 36],
   block: [0, 8],
   hit: [1, 18],
@@ -144,13 +146,20 @@ function copyFighter(fighter: Fighter): DebugFighterSnapshot {
     aerobicOutputTicks: fighter.aerobicOutputTicks,
     aerobicGlycolysisCooldown: fighter.aerobicGlycolysisCooldown,
     aerobicLightReady: fighter.aerobicLightReady,
+    separationStep: fighter.separationStep,
+    separationStepCooldown: fighter.separationStepCooldown,
   };
   return Object.freeze(copied);
 }
 
 function validateFighter(fighter: Fighter): void {
   validateAllowedKeys(fighter, FIGHTER_FIELDS, "fighter");
-  if (fighter.role !== "warburg" && fighter.role !== "opponent") {
+  if (
+    fighter.role !== "warburg" &&
+    fighter.role !== "curie" &&
+    fighter.role !== "franklin" &&
+    fighter.role !== "opponent"
+  ) {
     throw new Error(`Unknown fighter role: ${String(fighter.role)}`);
   }
   validateNumber("Fighter x", fighter.x, -9, 9);
@@ -176,8 +185,13 @@ function validateFighter(fighter: Fighter): void {
     true,
   );
   validateBoolean("Fighter aerobicLightReady", fighter.aerobicLightReady);
+  validateBoolean("Fighter separationStep", fighter.separationStep);
+  validateNumber("Fighter separationStepCooldown", fighter.separationStepCooldown, 0, 72, true);
   if (fighter.lactateDrive && fighter.state !== "light") {
     throw new Error("Fighter Lactate Drive can only be active during a light attack");
+  }
+  if (fighter.separationStep && fighter.state !== "light") {
+    throw new Error("Fighter Separation Step can only be active during a light attack");
   }
 }
 

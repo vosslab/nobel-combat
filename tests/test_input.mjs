@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { mapPlayerInput } from "../src/input.ts";
+import { mapPlayerInput, mapSelectionInput } from "../src/input.ts";
 
 const keys = (...codes) => new Set(codes);
 const pad = ({ axes = [], buttons = [], mapping = "standard" } = {}) => ({
@@ -39,6 +39,48 @@ test("keyboard and standard gamepad controls have action parity", () => {
     mapPlayerInput(new Set(), pad({ buttons: at(0, 5) }), 0).action,
     "J+L and south+right-shoulder must map to the same Aerobic Glycolysis chord",
   );
+});
+
+test("selection keyboard and standard gamepad navigation have parity", () => {
+  assert.deepEqual(
+    mapSelectionInput(keys("ArrowLeft", "Enter"), null),
+    mapSelectionInput(new Set(), pad({ buttons: at(14, 9) })),
+  );
+  assert.deepEqual(
+    mapSelectionInput(keys("KeyD", "Space"), null),
+    mapSelectionInput(new Set(), pad({ axes: [1], buttons: at(0) })),
+  );
+  assert.deepEqual(
+    mapSelectionInput(keys("KeyA"), null),
+    mapSelectionInput(new Set(), pad({ axes: [-1] })),
+  );
+});
+
+test("selection input ignores neutral, nonstandard, and invalid gamepad values", () => {
+  assert.deepEqual(mapSelectionInput(new Set(), null), {
+    previous: false,
+    next: false,
+    confirm: false,
+  });
+  assert.deepEqual(mapSelectionInput(new Set(), pad({ axes: [0.2] })), {
+    previous: false,
+    next: false,
+    confirm: false,
+  });
+  assert.deepEqual(
+    mapSelectionInput(new Set(), pad({ mapping: "", axes: [-1], buttons: at(0, 9, 14, 15) })),
+    { previous: false, next: false, confirm: false },
+  );
+  assert.deepEqual(mapSelectionInput(new Set(), pad({ axes: [Infinity], buttons: [] })), {
+    previous: false,
+    next: false,
+    confirm: false,
+  });
+  assert.deepEqual(mapSelectionInput(keys("KeyA", "Enter"), pad({ axes: [Number.NaN] })), {
+    previous: true,
+    next: false,
+    confirm: true,
+  });
 });
 
 test("movement is camera-relative, diagonal-normalized, and finite", () => {

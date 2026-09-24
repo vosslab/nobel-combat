@@ -1,4 +1,4 @@
-# Otto Warburg source dossier
+# Otto Heinrich Warburg source dossier
 
 ## Scope
 
@@ -49,9 +49,9 @@ injury effect.
 Warburg's **Oxygen Transfer** replaces his standard heavy attack. It starts faster (32 rather than
 36 ticks), reaches 2.45 rather than 2.2 arena units, deals 28 rather than 24 damage (6 rather than
 5 through a held block), and holds an unblocked target down for 72 rather than 70 ticks. Its first
-contact frame arrives after eight simulation advances; one hit per swing and the standard arena
-bounds still apply. The AI's heavy remains unchanged. These are explicit game-balance choices; the
-historical research does not confer a real-world fighting ability.
+contact occurs on the ninth tick after the input starts the attack; one hit per swing and the
+standard arena bounds still apply. The AI's heavy remains unchanged. These are explicit game-balance
+choices; the historical research does not confer a real-world fighting ability.
 
 During startup, the forearm gauge needle swings and a brief iron-red pulse runs up the glass tube.
 On contact, a short red-white ring flashes at the opponent's chest. This makes the move readable as
@@ -76,5 +76,4 @@ Two further moves use Warburg's reported respiration and lactic-acid fermentatio
 cancer cells, including at oxygen saturation. **Lactate Drive** is a short forward rush followed by
 a jab. **Aerobic Glycolysis** opens a brief movement and next-light window. These are deliberately
 simple game metaphors; they do not model tumor biology, imply that lactate powers movement, or claim
-a therapeutic effect. [Warburg, _Science_ 123 (1956), 309-314]
-(https://doi.org/10.1126/science.123.3191.309)
+a therapeutic effect. [Warburg, _Science_ 123 (1956), 309-314](https://doi.org/10.1126/science.123.3191.309).

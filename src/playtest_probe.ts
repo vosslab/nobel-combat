@@ -22,7 +22,15 @@ export function installPlaytestProbe(
     rootId: number;
     activeClip: string | undefined;
     disposed: boolean;
+    x: number;
+    y: number;
+    z: number;
+    yaw: number;
   }> | null,
+  cues: () => {
+    oxygen: { enabled: boolean; x: number; y: number; z: number };
+    output: { enabled: boolean; x: number; y: number; z: number };
+  },
   input: () => InputFrame,
 ): void {
   if (!playtestMode()) return;
@@ -45,11 +53,13 @@ export function installPlaytestProbe(
       target: { x: camera.getTarget().x, y: camera.getTarget().y, z: camera.getTarget().z },
       view: view(),
       rigs: rigs(),
+      cues: cues(),
       input: input(),
       screen: match.fighters.map((fighter) => project(fighter.x, 1.2, fighter.z)),
       screenBounds: match.fighters.map((fighter) => ({
         feet: project(fighter.x, 0, fighter.z),
         head: project(fighter.x, 2.7, fighter.z),
+        modelTop: project(fighter.x, fighter.role === "warburg" ? 1.8 : 1.67, fighter.z),
       })),
     }),
   });

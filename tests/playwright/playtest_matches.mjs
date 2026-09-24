@@ -57,6 +57,38 @@ async function setInput(page, device, action) {
     }
   }
 }
+function selectedRoles(device) {
+  return device === "keyboard" ? ["warburg", "curie"] : ["curie", "warburg"];
+}
+async function waitForNeutralFrame(page) {
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+}
+async function confirmFighter(page, device) {
+  await page.waitForSelector("#start-match");
+  if (device === "keyboard") {
+    await page.waitForFunction(() => document.querySelector("#select-warburg")?.checked === true);
+    await page.keyboard.press("Enter");
+  } else {
+    await page.evaluate(() => (window.__testPad.axes = [1, 0]));
+    await page.waitForFunction(() => document.querySelector("#select-curie")?.checked === true);
+    await page.evaluate(() => (window.__testPad.axes = [0, 0]));
+    await page.waitForTimeout(40);
+    await page.evaluate(() => (window.__testPad.buttons[0].pressed = true));
+    await page.waitForFunction(() => !document.querySelector("#fighter-select")?.open);
+    await page.evaluate(() => (window.__testPad.buttons[0].pressed = false));
+  }
+  await page.waitForFunction(
+    (roles) =>
+      window
+        .__fightSnapshot?.()
+        .fighters.map((fighter) => fighter.role)
+        .join(",") === roles.join(","),
+    selectedRoles(device),
+  );
+  await waitForNeutralFrame(page);
+}
 async function run(device, desired) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   if (device === "gamepad")
@@ -78,6 +110,7 @@ async function run(device, desired) {
     if (m.type() === "error") errors.push(m.text());
   });
   await page.goto(liveUrl());
+  await confirmFighter(page, device);
   let s;
   for (let i = 0; i < 40; i++) {
     s = await snapshot(page);
@@ -137,6 +170,7 @@ async function run(device, desired) {
     await page.keyboard.up("r");
   }
   const restarted = await snapshot(page);
+  const expectedRoles = selectedRoles(device);
   const result = {
     device,
     desired,
@@ -156,7 +190,9 @@ async function run(device, desired) {
       round: restarted.round,
       hp: restarted.fighters.map((f) => f.hp),
       wins: restarted.fighters.map((f) => f.wins),
+      roles: restarted.fighters.map((f) => f.role),
     },
+    roles: s.fighters.map((f) => f.role),
     errors,
   };
   results.push(result);
@@ -164,9 +200,11 @@ async function run(device, desired) {
   if (
     s.phase !== "matchOver" ||
     s.winner !== (desired === "red" ? 0 : 1) ||
+    s.fighters.map((f) => f.role).join(",") !== expectedRoles.join(",") ||
     restarted.phase !== "fight" ||
     restarted.round !== 1 ||
     restarted.fighters.some((f) => f.hp !== 100 || f.wins !== 0) ||
+    restarted.fighters.map((f) => f.role).join(",") !== expectedRoles.join(",") ||
     errors.length
   )
     failures++;

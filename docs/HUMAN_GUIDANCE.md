@@ -27,6 +27,7 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
   retargeting framework, roster, or customization system for this visual milestone.
 - Capture deterministic state screenshots as artifacts and validate asset load, skeletons, animation
   selection, and browser behavior automatically; human visual approval is not a completion gate.
-- After the generic fighter works, continue with Otto Warburg as the signature and deliberately
+- After the generic fighter works, continue with Otto Heinrich Warburg as the signature and deliberately
   strongest fighter, with powers based on cellular respiration, tumor metabolism, and the Warburg
   effect. Rosalind Franklin is planned as a secret unlockable fighter.
+- Always use Otto Heinrich Warburg's full name; Heinrich is important.

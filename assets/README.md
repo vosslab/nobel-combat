@@ -17,8 +17,9 @@ animation groups directly without retargeting.
 
 | File                                     | Upstream path                                                       | SHA-256                                                            | Purpose                                                       |
 | ---------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------- |
-| `models/mesh2motion_doctor_m.glb`        | `static/models-variation/human/doctor_m.glb`                        | `2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d` | Otto Warburg's adult scientist presentation model             |
-| `models/mesh2motion_male_5.glb`          | `static/models-variation/human/male_5.glb`                          | `95442754e9eee97eb2e90fae9f1241bb78f1f610e6d8bffa9a3315b9e957ced3` | Adult-proportioned standard AI opponent                       |
+| `models/mesh2motion_doctor_m.glb`        | `static/models-variation/human/doctor_m.glb`                        | `2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d` | Otto Heinrich Warburg's adult scientist presentation model             |
+| `models/mesh2motion_female_31.glb`       | `static/models-variation/human/female_31.glb`                       | `72c50339c0caa248b19ec11a5c188d52f6e2bf8e16bd0dd64e98ae756680ceb3` | Marie Curie's authored adult-human presentation model         |
+| `models/mesh2motion_male_5.glb`          | `static/models-variation/human/male_5.glb`                          | `95442754e9eee97eb2e90fae9f1241bb78f1f610e6d8bffa9a3315b9e957ced3` | Generic adult-human compatibility fixture                     |
 | `animations/mesh2motion_human_base.glb`  | Blender-trimmed from `static/animations/human-base-animations.glb`  | `f8565f8e43506df0f11430ec1262c078f68e833a349cb57d5cec04f73cfc4b15` | `Walk`, `Punch_Cross`, `Hit_Knockback`, and `LayToIdle`       |
 | `animations/mesh2motion_human_addon.glb` | Blender-trimmed from `static/animations/human-addon-animations.glb` | `bf087458d30e10c2cbc636e70a41a5f2dd5dbbcf6dc22c088fb893c3fcfff6b9` | `Fighting Idle`, `Fighting Left Jab`, `Defend`, and `Death_C` |
 

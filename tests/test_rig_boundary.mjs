@@ -74,30 +74,39 @@ function skinJointNames(document, label) {
 }
 
 test("Mesh2Motion human models retain matching complete local rigs", async () => {
-  const [male, doctor] = await Promise.all([
+  const [male, doctor, curie] = await Promise.all([
     readGlb("assets/models/mesh2motion_male_5.glb"),
     readGlb("assets/models/mesh2motion_doctor_m.glb"),
+    readGlb("assets/models/mesh2motion_female_31.glb"),
   ]);
 
   const maleJointNames = skinJointNames(male, "Mesh2Motion male_5");
   const doctorJointNames = skinJointNames(doctor, "Mesh2Motion doctor_m");
+  const curieJointNames = skinJointNames(curie, "Mesh2Motion female_31");
   assert.deepEqual(
     doctorJointNames,
     maleJointNames,
     "doctor_m joint ordering must exactly match male_5 for native animation reuse",
   );
+  assert.deepEqual(
+    curieJointNames,
+    maleJointNames,
+    "female_31 joint ordering must exactly match the existing local rigs for native animation reuse",
+  );
 });
 
-test("curated Mesh2Motion animations cover every combat state on both local human rigs", async () => {
-  const [male, doctor, base, addon] = await Promise.all([
+test("curated Mesh2Motion animations cover every combat state on all local human rigs", async () => {
+  const [male, doctor, curie, base, addon] = await Promise.all([
     readGlb("assets/models/mesh2motion_male_5.glb"),
     readGlb("assets/models/mesh2motion_doctor_m.glb"),
+    readGlb("assets/models/mesh2motion_female_31.glb"),
     readGlb("assets/animations/mesh2motion_human_base.glb"),
     readGlb("assets/animations/mesh2motion_human_addon.glb"),
   ]);
   const rigNamesByModel = new Map([
     ["male_5", new Set(skinJointNames(male, "Mesh2Motion male_5"))],
     ["doctor_m", new Set(skinJointNames(doctor, "Mesh2Motion doctor_m"))],
+    ["female_31", new Set(skinJointNames(curie, "Mesh2Motion female_31"))],
   ]);
 
   const baseAnimations = animationByName(base);

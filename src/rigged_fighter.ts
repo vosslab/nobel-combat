@@ -1,12 +1,4 @@
-import {
-  AnimationGroup,
-  Color3,
-  PBRMaterial,
-  Scene,
-  Skeleton,
-  StandardMaterial,
-  TransformNode,
-} from "@babylonjs/core";
+import { AnimationGroup, Scene, Skeleton, TransformNode } from "@babylonjs/core";
 import type { Node } from "@babylonjs/core";
 import type { InstantiatedEntries } from "@babylonjs/core/assetContainer";
 import type { Material } from "@babylonjs/core/Materials/material";
@@ -16,7 +8,7 @@ import "@babylonjs/loaders/glTF";
 import type { State } from "./match";
 
 const WARBURG_MODEL_URL = "assets/models/mesh2motion_doctor_m.glb";
-const AI_MODEL_URL = "assets/models/mesh2motion_male_5.glb";
+const CURIE_MODEL_URL = "assets/models/mesh2motion_female_31.glb";
 const BASE_ANIMATION_URL = "assets/animations/mesh2motion_human_base.glb";
 const ADDON_ANIMATION_URL = "assets/animations/mesh2motion_human_addon.glb";
 const CLIP_NAMES = ["idle", "move", "light", "heavy", "block", "hit", "down", "getup"] as const;
@@ -49,12 +41,23 @@ const CLIP_SPEEDS: Record<State, number> = {
 
 export type RiggedFighterSnapshot = Readonly<{
   rootId: number;
+  fighterName: FighterPresentationName;
+  skeletonIds: readonly string[];
+  materialIds: readonly string[];
+  materialAlphas: readonly number[];
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
   activeClip: State | undefined;
   disposed: boolean;
 }>;
 
+export type FighterPresentationName = "Otto Heinrich Warburg" | "Marie Curie" | "Rosalind Franklin";
+
 export type RiggedFighterModel = {
   root: TransformNode;
+  setFighterName: (name: FighterPresentationName) => void;
   update: (state: State) => void;
   dispose: () => void;
   snapshot: () => RiggedFighterSnapshot;
@@ -143,16 +146,6 @@ function clipsForInstance(
   return clips as ClipMap;
 }
 
-function setColor(root: TransformNode, color: Color3): void {
-  for (const mesh of root.getChildMeshes()) {
-    const { material } = mesh;
-    if (material instanceof PBRMaterial)
-      material.albedoColor = material.albedoColor.multiply(color);
-    if (material instanceof StandardMaterial)
-      material.diffuseColor = material.diffuseColor.multiply(color);
-  }
-}
-
 function materialsFor(root: TransformNode): Set<Material> {
   const materials = new Set<Material>();
   for (const mesh of root.getChildMeshes()) if (mesh.material) materials.add(mesh.material);
@@ -185,14 +178,15 @@ function assertIndependentAnimationResources(
 
 function createFighter(
   root: TransformNode,
-  color: Color3 | undefined,
+  initialFighterName: FighterPresentationName,
+  skeletons: Skeleton[],
   clips: ClipMap,
   disposeEntries: () => void,
 ): RiggedFighterModel {
   let activeState: State | undefined;
+  let fighterName = initialFighterName;
   let disposed = false;
   const groups = Object.values(clips);
-  if (color) setColor(root, color);
 
   function update(state: State): void {
     if (activeState === state) return;
@@ -211,12 +205,28 @@ function createFighter(
     root.dispose();
   }
 
+  function setFighterName(name: FighterPresentationName): void {
+    fighterName = name;
+  }
+
   function snapshot(): RiggedFighterSnapshot {
-    return Object.freeze({ rootId: root.uniqueId, activeClip: activeState, disposed });
+    return Object.freeze({
+      rootId: root.uniqueId,
+      fighterName,
+      skeletonIds: skeletons.map((skeleton) => skeleton.id),
+      materialIds: [...materialsFor(root)].map((material) => material.id),
+      materialAlphas: [...materialsFor(root)].map((material) => material.alpha),
+      x: root.position.x,
+      y: root.position.y,
+      z: root.position.z,
+      yaw: root.rotation.y,
+      activeClip: activeState,
+      disposed,
+    });
   }
 
   update("idle");
-  return { root, update, dispose, snapshot };
+  return { root, setFighterName, update, dispose, snapshot };
 }
 
 function parentRootNodes(root: TransformNode, nodes: Node[]): void {
@@ -246,7 +256,7 @@ function createSourceRelease(...assets: AssetContainer[]): () => void {
 }
 
 /**
- * Loads the CC0 Mesh2Motion scientist and AI assets with independent rigs.
+ * Loads the CC0 Mesh2Motion Warburg and female_31 assets with independent rigs.
  * Match remains the sole authority for movement, combat, and timing.
  */
 export async function loadRiggedFighters(
@@ -254,10 +264,10 @@ export async function loadRiggedFighters(
   onError: RiggedFighterLoadError,
 ): Promise<[RiggedFighterModel, RiggedFighterModel]> {
   try {
-    const [warburgModelAsset, aiModelAsset, baseAnimationAsset, addonAnimationAsset] =
+    const [warburgModelAsset, curieModelAsset, baseAnimationAsset, addonAnimationAsset] =
       await Promise.all([
         LoadAssetContainerAsync(WARBURG_MODEL_URL, scene),
-        LoadAssetContainerAsync(AI_MODEL_URL, scene),
+        LoadAssetContainerAsync(CURIE_MODEL_URL, scene),
         LoadAssetContainerAsync(BASE_ANIMATION_URL, scene),
         LoadAssetContainerAsync(ADDON_ANIMATION_URL, scene),
       ]);
@@ -269,29 +279,35 @@ export async function loadRiggedFighters(
       (sourceName) => `Warburg ${sourceName}`,
       true,
     );
-    const blueEntries = aiModelAsset.instantiateModelsToScene(
-      (sourceName) => `AI ${sourceName}`,
+    const blueEntries = curieModelAsset.instantiateModelsToScene(
+      (sourceName) => `Curie ${sourceName}`,
       true,
     );
     const redRoot = new TransformNode("Warburg rig root", scene);
-    const blueRoot = new TransformNode("AI rig root", scene);
+    const blueRoot = new TransformNode("Curie rig root", scene);
     parentRootNodes(redRoot, redEntries.rootNodes);
     parentRootNodes(blueRoot, blueEntries.rootNodes);
     const redClips = clipsForInstance(redEntries.skeletons, sourceGroups, "Warburg");
-    const blueClips = clipsForInstance(blueEntries.skeletons, sourceGroups, "AI");
+    const blueClips = clipsForInstance(blueEntries.skeletons, sourceGroups, "Curie");
     assertIndependentInstances(redRoot, blueRoot);
     assertIndependentAnimationResources(redEntries, blueEntries, redClips, blueClips);
     const releaseSource = createSourceRelease(
       warburgModelAsset,
-      aiModelAsset,
+      curieModelAsset,
       baseAnimationAsset,
       addonAnimationAsset,
     );
-    const red = createFighter(redRoot, undefined, redClips, () => {
-      redEntries.dispose();
-      releaseSource();
-    });
-    const blue = createFighter(blueRoot, new Color3(0.06, 0.25, 0.9), blueClips, () => {
+    const red = createFighter(
+      redRoot,
+      "Otto Heinrich Warburg",
+      redEntries.skeletons,
+      redClips,
+      () => {
+        redEntries.dispose();
+        releaseSource();
+      },
+    );
+    const blue = createFighter(blueRoot, "Marie Curie", blueEntries.skeletons, blueClips, () => {
       blueEntries.dispose();
       releaseSource();
     });

@@ -7,11 +7,16 @@ import type { TestInfo } from "@playwright/test";
 
 const scriptsDirectory = fileURLToPath(new URL(".", import.meta.url));
 
-async function runScenario(testInfo: TestInfo, script: string, url: string): Promise<void> {
+async function runScenario(
+  testInfo: TestInfo,
+  script: string,
+  url: string,
+  extraArgs: string[] = [],
+): Promise<void> {
   const output: string[] = [];
   const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
     (resolve, reject) => {
-      const child = spawn(process.execPath, [script, "--url", url], {
+      const child = spawn(process.execPath, [script, "--url", url, ...extraArgs], {
         cwd: scriptsDirectory,
         stdio: ["ignore", "pipe", "pipe"],
       });
@@ -49,4 +54,14 @@ test("live keyboard and synthetic-gamepad traversal stays responsive and visible
 }, testInfo) => {
   test.setTimeout(90_000);
   await runScenario(testInfo, "playtest_traversal.mjs", baseURL!);
+});
+
+test("capture Franklin's eight rigged combat states", async ({ baseURL }, testInfo) => {
+  test.setTimeout(90_000);
+  await runScenario(testInfo, "capture_rig_states.mjs", baseURL!, [
+    "--opponent",
+    "franklin",
+    "--output-dir",
+    "../../test-results/rig-states-franklin-f4",
+  ]);
 });

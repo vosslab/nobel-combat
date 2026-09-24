@@ -47,6 +47,30 @@ async function control(page, device, x, z, action = "") {
     }
   }
 }
+async function waitForNeutralFrame(page) {
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+}
+async function confirmFighter(page, device) {
+  await page.waitForSelector("#start-match");
+  await page.waitForFunction(() => document.querySelector("#select-warburg")?.checked === true);
+  if (device === "keyboard") {
+    await page.keyboard.press("Enter");
+  } else {
+    await page.evaluate(() => (window.__testPad.buttons[9].pressed = true));
+    await page.waitForFunction(() => !document.querySelector("#fighter-select")?.open);
+    await page.evaluate(() => (window.__testPad.buttons[9].pressed = false));
+  }
+  await page.waitForFunction(
+    () =>
+      window
+        .__fightSnapshot?.()
+        .fighters.map((fighter) => fighter.role)
+        .join(",") === "warburg,curie",
+  );
+  await waitForNeutralFrame(page);
+}
 async function run(device) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   if (device === "gamepad")
@@ -68,6 +92,7 @@ async function run(device) {
     if (m.type() === "error") errors.push(m.text());
   });
   await page.goto(liveUrl());
+  await confirmFighter(page, device);
   await page.waitForFunction(() => window.__fightSnapshot?.().rigs?.length === 2);
   const observed = new Set();
   let min = 100,
@@ -115,6 +140,7 @@ async function run(device) {
     round: s.round,
     hp: s.fighters.map((f) => f.hp),
     wins: s.fighters.map((f) => f.wins),
+    roles: s.fighters.map((f) => f.role),
   };
   const beforeDirectional = s.fighters[0].x;
   if (device === "gamepad") {
@@ -182,7 +208,8 @@ if (
       !r.observed.includes("block") ||
       r.errors.length ||
       r.restart.round !== 1 ||
-      r.restart.hp.some((h) => h !== 100),
+      r.restart.hp.some((h) => h !== 100) ||
+      r.restart.roles.join(",") !== "warburg,curie",
   )
 )
   process.exitCode = 1;

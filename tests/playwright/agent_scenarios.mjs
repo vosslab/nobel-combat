@@ -1,8 +1,17 @@
 import { chromium } from "playwright";
+import { mkdirSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const NEUTRAL = Object.freeze({ x: 0, z: 0, light: false, heavy: false, block: false });
 const RED = 0;
 const BLUE = 1;
+const RIG_POSITION_TOLERANCE = 0.0001;
+const RIG_YAW_TOLERANCE = 0.0001;
+const EVIDENCE_DIR = resolve(
+  fileURLToPath(new URL("../../", import.meta.url)),
+  "test-results/warburg-powers",
+);
 
 function readOption(name, fallback) {
   const position = process.argv.indexOf(name);
@@ -50,6 +59,9 @@ async function waitForFrame(page) {
 }
 
 async function snapshot(page) {
+  // Debug advances simulation synchronously, while the render loop copies
+  // authoritative fighter transforms to rig roots on animation frames. Two
+  // frames guarantee this snapshot observes a post-draw transform.
   await waitForFrame(page);
   const state = await page.evaluate(() => {
     const fight = window.__fightDebug;
@@ -62,12 +74,52 @@ async function snapshot(page) {
         blueHealth: get("#blue-health")?.style.width ?? "",
         redWins: get("#red-wins")?.textContent ?? "",
         blueWins: get("#blue-wins")?.textContent ?? "",
+        redName: get("#red-name")?.textContent ?? "",
+        blueName: get("#blue-name")?.textContent ?? "",
+        redStatusLabel: get("#red-status")?.getAttribute("aria-label") ?? "",
+        blueStatusLabel: get("#blue-status")?.getAttribute("aria-label") ?? "",
+        redHealthLabel: get("#red-health")?.parentElement?.getAttribute("aria-label") ?? "",
+        blueHealthLabel: get("#blue-health")?.parentElement?.getAttribute("aria-label") ?? "",
         status: get("#status")?.textContent ?? "",
+        moveName: get("#move-name")?.textContent ?? "",
+        curieIndicatorHidden: get("#curie-indicator")?.hidden ?? true,
+        curieName: get("#curie-indicator")?.textContent?.trim() ?? "",
+        curieMeterWidth: get("#curie-meter-fill")?.style.width ?? "",
       },
     };
   });
   assert(state?.fighters?.length === 2, "Debug snapshot did not contain two fighters");
   return state;
+}
+
+function assertRenderedRigSync(snapshot, label) {
+  for (const [index, fighter] of snapshot.fighters.entries()) {
+    const rig = snapshot.rigs?.[index];
+    assert(rig, `${label}: rig ${index} is missing`);
+    assert(
+      [rig.x, rig.y, rig.z, rig.yaw].every(Number.isFinite),
+      `${label}: rig ${index} has a nonfinite root transform`,
+    );
+    assert(
+      Math.abs(rig.x - fighter.x) <= RIG_POSITION_TOLERANCE &&
+        Math.abs(rig.y) <= RIG_POSITION_TOLERANCE &&
+        Math.abs(rig.z - fighter.z) <= RIG_POSITION_TOLERANCE,
+      `${label}: rig ${index} root position drifted from fighter state`,
+    );
+    assert(
+      Math.abs(rig.yaw - fighter.facing) <= RIG_YAW_TOLERANCE,
+      `${label}: rig ${index} root yaw drifted from fighter facing`,
+    );
+  }
+}
+
+function assertCueAt(cue, fighter, label) {
+  assert(cue?.enabled, `${label}: cue was not visible`);
+  assert(
+    Math.abs(cue.x - fighter.x) <= RIG_POSITION_TOLERANCE &&
+      Math.abs(cue.z - fighter.z) <= RIG_POSITION_TOLERANCE,
+    `${label}: cue did not follow the role-resolved fighter`,
+  );
 }
 
 async function advance(page, ticks, red = NEUTRAL, blue = NEUTRAL) {
@@ -97,7 +149,10 @@ function assertValid(snapshot, label) {
   assert(Number.isInteger(snapshot.round) && snapshot.round >= 1, `${label}: invalid round`);
   for (const fighter of snapshot.fighters) {
     assert(
-      fighter.role === "warburg" || fighter.role === "opponent",
+      fighter.role === "warburg" ||
+        fighter.role === "curie" ||
+        fighter.role === "franklin" ||
+        fighter.role === "opponent",
       `${label}: unknown fighter role`,
     );
     assert(states.has(fighter.state), `${label}: invalid fighter state ${fighter.state}`);
@@ -129,7 +184,17 @@ function assertValid(snapshot, label) {
         fighter.aerobicGlycolysisCooldown <= 150,
       `${label}: invalid Aerobic Glycolysis cooldown`,
     );
+    assert(
+      Number.isInteger(fighter.separationStepCooldown) &&
+        fighter.separationStepCooldown >= 0 &&
+        fighter.separationStepCooldown <= 72,
+      `${label}: invalid Separation Step cooldown`,
+    );
     assert(!fighter.lactateDrive || fighter.state === "light", `${label}: orphaned drive state`);
+    assert(
+      !fighter.separationStep || fighter.state === "light",
+      `${label}: orphaned Separation Step`,
+    );
     assert(
       !fighter.aerobicLightReady || fighter.aerobicOutputTicks > 0,
       `${label}: expired powered-light charge`,
@@ -150,6 +215,17 @@ function assertValid(snapshot, label) {
   assert(view.pitch >= 0.3 && view.pitch <= 0.85, `${label}: camera pitch escaped bounds`);
   assert(view.zoom >= 0.85 && view.zoom <= 1.5, `${label}: camera zoom escaped bounds`);
   assert(snapshot.rigs?.length === 2, `${label}: two rigged fighters were not ready`);
+  const expectedRigName = (role) => {
+    if (role === "warburg") return "Otto Heinrich Warburg";
+    if (role === "franklin") return "Rosalind Franklin";
+    return "Marie Curie";
+  };
+  for (const [index, fighter] of snapshot.fighters.entries()) {
+    assert(
+      snapshot.rigs?.[index]?.fighterName === expectedRigName(fighter.role),
+      `${label}: rig ${index} did not follow ${fighter.role} presentation`,
+    );
+  }
   for (const [index, rig] of snapshot.rigs.entries()) {
     assert(!rig.disposed, `${label}: rig ${index} was disposed`);
     assert(
@@ -157,6 +233,7 @@ function assertValid(snapshot, label) {
       `${label}: rig ${index} clip drifted from fighter state`,
     );
   }
+  assertRenderedRigSync(snapshot, label);
   for (const point of snapshot.screen ?? []) {
     assert(
       [point.x, point.y, point.z].every(Number.isFinite),
@@ -186,6 +263,23 @@ function assertValid(snapshot, label) {
   assert(snapshot.hud.blueHealth === `${blue.hp}%`, `${label}: blue health HUD drift`);
   assert(snapshot.hud.redWins.includes(String(red.wins)), `${label}: red wins HUD drift`);
   assert(snapshot.hud.blueWins.includes(String(blue.wins)), `${label}: blue wins HUD drift`);
+  const redName = expectedRigName(red.role);
+  const blueName = expectedRigName(blue.role);
+  assert(snapshot.hud.redName === redName.toUpperCase(), `${label}: red fighter name drift`);
+  assert(
+    snapshot.hud.blueName === `${blueName} AI`.toUpperCase(),
+    `${label}: blue fighter name drift`,
+  );
+  assert(snapshot.hud.redStatusLabel === `${redName} status`, `${label}: red status ARIA drift`);
+  assert(
+    snapshot.hud.blueStatusLabel === `${blueName} AI status`,
+    `${label}: blue status ARIA drift`,
+  );
+  assert(snapshot.hud.redHealthLabel === `${redName} health`, `${label}: red health ARIA drift`);
+  assert(
+    snapshot.hud.blueHealthLabel === `${blueName} AI health`,
+    `${label}: blue health ARIA drift`,
+  );
 }
 
 async function runMovement(page, report) {
@@ -193,17 +287,21 @@ async function runMovement(page, report) {
   await advance(page, 32, action(0, 1));
   let state = await advance(page, 75, action(1, 0));
   assert(state.fighters[RED].x > state.fighters[BLUE].x, "crossing sides failed");
+  assertRenderedRigSync(state, "crossing sides");
   report.crossings++;
   await restart(page);
   await advance(page, 32, action(0, -1));
   state = await advance(page, 75, action(1, 0));
   assert(state.fighters[RED].x > 0, "opposite-direction crossing failed");
+  assertRenderedRigSync(state, "opposite-direction crossing");
   report.crossings++;
   state = await advance(page, 90, action(0, 1), action(0, -1));
   assert(Math.abs(state.fighters[RED].z) > 2, "clockwise circle did not move red");
+  assertRenderedRigSync(state, "clockwise circle");
   await restart(page);
   state = await advance(page, 90, action(0, -1), action(0, 1));
   assert(Math.abs(state.fighters[RED].z) > 2, "counterclockwise circle did not move red");
+  assertRenderedRigSync(state, "counterclockwise circle");
   await restart(page);
   state = await advance(page, 180, action(-1, -1), action(1, 1));
   assert(
@@ -211,9 +309,11 @@ async function runMovement(page, report) {
     "arena edge was not reached",
   );
   assert(distance(state) > 10, "maximum practical separation was not reached");
+  assertRenderedRigSync(state, "maximum separation");
   report.maxDistance = Math.max(report.maxDistance, distance(state));
   state = await advance(page, 220, action(1, 1), action(-1, -1));
   assert(distance(state) >= 1.09, "collision separation failed after approach");
+  assertRenderedRigSync(state, "approach after maximum separation");
   assertValid(state, "movement");
 }
 
@@ -250,6 +350,8 @@ async function runCombat(page, report) {
     state.fighters[BLUE].hp === 72 && state.fighters[BLUE].state === "down",
     "heavy attack did not knock down",
   );
+  assert(state.hud.moveName.includes("OXYGEN TRANSFER"), "heavy move label did not synchronize");
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, "oxygen-transfer-contact.png") });
   report.states.add("heavy");
   report.states.add("down");
   state = await advance(page, 71);
@@ -269,6 +371,8 @@ async function runWarburgPowers(page, report) {
     state.fighters[RED].lactateDrive && state.fighters[RED].lactateDriveCooldown === 44,
     "Lactate Drive chord did not start with its cooldown",
   );
+  assert(state.hud.moveName.includes("LACTATE DRIVE"), "Lactate Drive label did not synchronize");
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, "lactate-drive-start.png") });
   state = await advance(page, 9);
   assert(Math.abs(state.fighters[RED].x - 0.648) < 1e-8, "Lactate Drive startup distance drift");
   assert(state.fighters[BLUE].hp === 100, "Lactate Drive hit before its ten-tick startup");
@@ -299,6 +403,11 @@ async function runWarburgPowers(page, report) {
       state.fighters[RED].aerobicLightReady,
     "Aerobic Glycolysis chord did not start its output window",
   );
+  assert(
+    state.hud.moveName.includes("AEROBIC GLYCOLYSIS"),
+    "Aerobic Glycolysis label did not synchronize",
+  );
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, "aerobic-glycolysis-window.png") });
   state = await advance(page, 71);
   assert(state.fighters[RED].aerobicOutputTicks === 1, "output timer lost a tick");
   state = await advance(page, 1);
@@ -330,7 +439,230 @@ async function runWarburgPowers(page, report) {
       !state.fighters[RED].aerobicLightReady,
     "Aerobic Glycolysis did not power and consume the next successful light",
   );
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, "aerobic-powered-light.png") });
   assertValid(state, "Warburg research powers");
+}
+
+async function runCurieMatchRule(page, report) {
+  await restart(page);
+  await forceFighter(page, RED, { role: "curie", x: 0, z: 0, attackHeld: false });
+  await forceFighter(page, BLUE, {
+    role: "warburg",
+    x: 1.95,
+    z: 0,
+    hp: 100,
+    state: "idle",
+    ticks: 0,
+  });
+  let state = await advance(page, 1, action(0, 0, true, false, true));
+  assert(
+    state.fighters[RED].separationStep &&
+      state.fighters[RED].ticks === 24 &&
+      state.fighters[RED].separationStepCooldown === 72,
+    "Curie Separation Step did not start with its fixed timing",
+  );
+  assert(
+    !state.hud.curieIndicatorHidden,
+    "Curie research cue did not appear at Separation Step start",
+  );
+  assert(
+    state.hud.curieName.includes("SEPARATION STEP") &&
+      state.hud.curieName.includes("FRACTION / ACTIVITY"),
+    "Curie research cue did not name the move and measurement readout",
+  );
+  assert(
+    Number.parseFloat(state.hud.curieMeterWidth) === 0,
+    "Curie cue did not begin at zero progress",
+  );
+  state = await advance(page, 5);
+  assert(state.fighters[BLUE].hp === 100, "Curie Separation Step hit before post-input tick six");
+  assert(
+    Number.parseFloat(state.hud.curieMeterWidth) > 20 &&
+      Number.parseFloat(state.hud.curieMeterWidth) < 22,
+    "Curie research cue did not advance from authoritative attack ticks",
+  );
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, "curie-separation-step.png") });
+  state = await advance(page, 1);
+  assert(
+    state.fighters[BLUE].hp === 84 && state.fighters[BLUE].ticks === 16,
+    "Curie Separation Step did not apply its bounded contact",
+  );
+  state = await advance(page, 18);
+  assert(!state.fighters[RED].separationStep, "Curie Separation Step did not recover");
+  assert(state.hud.curieIndicatorHidden, "Curie research cue remained after recovery");
+
+  await restart(page);
+  await forceFighter(page, RED, { role: "curie", x: 0, z: 0, attackHeld: false });
+  await forceFighter(page, BLUE, { role: "warburg" });
+  state = await advance(page, 1, action(0, 0, true, false, true));
+  assert(!state.hud.curieIndicatorHidden, "Curie research cue was absent before interruption");
+  await forceFighter(page, RED, { state: "hit", ticks: 16, separationStep: false });
+  state = await snapshot(page);
+  assert(state.hud.curieIndicatorHidden, "Curie research cue remained after interruption");
+  assertValid(state, "Curie direct Match role");
+  report.moves.push("Separation Step");
+}
+
+async function runRoleAwarePresentation(page, report) {
+  const pairs = [
+    ["warburg", "curie"],
+    ["curie", "warburg"],
+  ];
+  for (const [redRole, blueRole] of pairs) {
+    await restart(page);
+    await forceFighter(page, RED, { role: redRole, x: -0.8, z: 0, hp: 63, wins: 1 });
+    await forceFighter(page, BLUE, { role: blueRole, x: 0.8, z: 0, hp: 47, wins: 0 });
+    let state = await snapshot(page);
+    assertValid(state, `${redRole} versus ${blueRole} presentation`);
+    assertRenderedRigSync(state, `${redRole} versus ${blueRole} presentation`);
+    assert(
+      state.rigs[0].rootId !== state.rigs[1].rootId,
+      `${redRole} versus ${blueRole}: fighters shared a rendered root`,
+    );
+    assert(
+      state.hud.redHealth === "63%",
+      `${redRole} versus ${blueRole}: red health name mismatch`,
+    );
+    assert(
+      state.hud.blueHealth === "47%",
+      `${redRole} versus ${blueRole}: blue health name mismatch`,
+    );
+    const warburgIndex = redRole === "warburg" ? RED : BLUE;
+    const curieIndex = redRole === "curie" ? RED : BLUE;
+    const targetIndex = warburgIndex === RED ? BLUE : RED;
+    await forceFighter(page, warburgIndex, { state: "idle", ticks: 0, attackHeld: false });
+    await forceFighter(page, targetIndex, { state: "idle", ticks: 0, attackHeld: false });
+    const heavyActions = [NEUTRAL, NEUTRAL];
+    heavyActions[warburgIndex] = action(0, 0, false, true);
+    await advance(page, 1, heavyActions[RED], heavyActions[BLUE]);
+    state = await advance(page, 14);
+    assert(
+      state.hud.moveName.includes("OXYGEN TRANSFER"),
+      `${redRole} versus ${blueRole}: Warburg move cue did not follow his role`,
+    );
+    assertCueAt(
+      state.cues?.oxygen,
+      state.fighters[targetIndex],
+      `${redRole} versus ${blueRole}: Oxygen Transfer`,
+    );
+    await forceFighter(page, warburgIndex, { state: "idle", ticks: 0, attackHeld: false });
+    const outputActions = [NEUTRAL, NEUTRAL];
+    outputActions[warburgIndex] = action(0, 0, true, false, true);
+    state = await advance(page, 1, outputActions[RED], outputActions[BLUE]);
+    assertCueAt(
+      state.cues?.output,
+      state.fighters[warburgIndex],
+      `${redRole} versus ${blueRole}: Aerobic Glycolysis`,
+    );
+    await forceFighter(page, curieIndex, {
+      state: "light",
+      ticks: 19,
+      attackHeld: true,
+      separationStep: true,
+      separationStepCooldown: 67,
+    });
+    state = await snapshot(page);
+    assert(
+      !state.hud.curieIndicatorHidden,
+      `${redRole} versus ${blueRole}: Curie research cue did not follow her role`,
+    );
+    await page.evaluate(() => window.__fightDebug.forceMatch({ phase: "matchOver", winner: 0 }));
+    state = await snapshot(page);
+    const winnerName = redRole === "warburg" ? "OTTO HEINRICH WARBURG" : "MARIE CURIE";
+    assert(
+      state.hud.status === `${winnerName} WINS THE MATCH`,
+      `${redRole} versus ${blueRole}: winner presentation did not follow role`,
+    );
+    await page.evaluate(() => window.__fightDebug.forceMatch({ phase: "matchOver", winner: 1 }));
+    state = await snapshot(page);
+    const aiWinnerName = blueRole === "warburg" ? "OTTO HEINRICH WARBURG" : "MARIE CURIE";
+    assert(
+      state.hud.status === `${aiWinnerName} WINS THE MATCH`,
+      `${redRole} versus ${blueRole}: AI winner presentation did not follow role`,
+    );
+    report.states.add(`${redRole}-player-presentation`);
+  }
+}
+
+function assertIndependentRenderResources(state, label) {
+  const [redRig, blueRig] = state.rigs ?? [];
+  assert(redRig && blueRig, `${label}: expected two presentation rigs`);
+  assert(redRig.rootId !== blueRig.rootId, `${label}: fighters shared a rendered root`);
+  assert(redRig.skeletonIds.length > 0, `${label}: red rig has no skeleton`);
+  assert(blueRig.skeletonIds.length > 0, `${label}: blue rig has no skeleton`);
+  assert(redRig.materialIds.length > 0, `${label}: red rig has no material`);
+  assert(blueRig.materialIds.length > 0, `${label}: blue rig has no material`);
+  assert(
+    redRig.materialAlphas.every(Number.isFinite) && blueRig.materialAlphas.every(Number.isFinite),
+    `${label}: fighter material alpha was nonfinite`,
+  );
+  assert(
+    !redRig.skeletonIds.some((id) => blueRig.skeletonIds.includes(id)),
+    `${label}: fighters shared a skeleton`,
+  );
+  assert(
+    !redRig.materialIds.some((id) => blueRig.materialIds.includes(id)),
+    `${label}: fighters shared a material`,
+  );
+}
+
+async function runFranklinPresentation(page, report) {
+  const stateTicks = {
+    idle: 0,
+    move: 0,
+    light: 1,
+    heavy: 1,
+    block: 0,
+    hit: 1,
+    down: 1,
+    getup: 1,
+  };
+  for (const [combatState, ticks] of Object.entries(stateTicks)) {
+    await restart(page);
+    await forceFighter(page, RED, {
+      role: "franklin",
+      x: -1.35,
+      z: 0,
+      state: combatState,
+      ticks,
+      attackHeld: false,
+      hitDone: false,
+    });
+    await forceFighter(page, BLUE, {
+      role: "warburg",
+      x: 1.35,
+      z: 0,
+      state: combatState,
+      ticks,
+      attackHeld: false,
+      hitDone: false,
+    });
+    const state = await snapshot(page);
+    assertValid(state, `Franklin ${combatState} presentation`);
+    assertRenderedRigSync(state, `Franklin ${combatState} presentation`);
+    assertIndependentRenderResources(state, `Franklin ${combatState} presentation`);
+    assert(
+      state.rigs[RED].fighterName === "Rosalind Franklin" &&
+        state.rigs[BLUE].fighterName === "Otto Heinrich Warburg",
+      `Franklin ${combatState}: rig identity did not follow assigned roles`,
+    );
+    assert(
+      state.hud.redName === "ROSALIND FRANKLIN" &&
+        state.hud.blueName === "OTTO HEINRICH WARBURG AI",
+      `Franklin ${combatState}: HUD identity did not follow assigned roles`,
+    );
+    assert(
+      state.rigs.every((rig) => rig.activeClip === combatState),
+      `Franklin ${combatState}: presentation clip did not follow combat state`,
+    );
+    report.states.add(`franklin-${combatState}`);
+  }
+  await page.evaluate(() => window.__fightDebug.forceMatch({ phase: "matchOver", winner: 0 }));
+  const state = await snapshot(page);
+  assert(
+    state.hud.status === "ROSALIND FRANKLIN WINS THE MATCH",
+    "Franklin winner presentation did not follow role",
+  );
 }
 
 function cameraDistance(before, after) {
@@ -429,6 +761,7 @@ async function runInputStress(page, report, seed) {
   const random = seededRandom(seed);
   let previousCamera;
   let maxJump = 0;
+  let maxJumpContext = "none";
   for (let batch = 0; batch < 1200; batch++) {
     const red = action(
       random() * 2 - 1,
@@ -452,10 +785,17 @@ async function runInputStress(page, report, seed) {
         state.camera.y - previousCamera.y,
         state.camera.z - previousCamera.z,
       );
-      maxJump = Math.max(maxJump, jump);
+      if (jump > maxJump) {
+        maxJump = jump;
+        maxJumpContext = `batch=${batch} phase=${state.phase} from=${JSON.stringify(previousCamera)} to=${JSON.stringify(state.camera)}`;
+      }
     }
     previousCamera = state.camera;
-    if (state.phase === "matchOver") await restart(page);
+    if (state.phase === "matchOver") {
+      state = await restart(page);
+      assertValid(state, `random restart batch ${batch}`);
+      previousCamera = state.camera;
+    }
   }
   state = await advance(page, 360);
   assertValid(state, "long idle");
@@ -465,16 +805,32 @@ async function runInputStress(page, report, seed) {
     ),
     "long idle left a combat state stuck",
   );
-  // Each debug sample advances twelve simulation ticks at once. The camera
-  // snaps to that synthetic state, so this bounds per-batch displacement;
-  // live-frame visibility and tracking are checked by playtest_traversal.
-  assert(maxJump <= 2.5, `random camera jump exceeded continuity budget: ${maxJump}`);
+  // Each debug sample advances twelve simulation ticks at once and snaps the
+  // camera to that synthetic state. A fighter can travel 12 * 0.095 units,
+  // both fighters can expand their separation by twice that amount, and one
+  // strike can add a 0.65-unit knockback. The framing radius changes with
+  // separation as well as midpoint movement, so 4.5 bounds that legal batch
+  // displacement with a small margin. Live frame continuity retains its
+  // tighter bound in the production-browser F7C scenario.
+  assert(
+    maxJump <= 4.5,
+    `random debug-batch camera jump exceeded 4.5-unit physical budget: ${maxJump}; ${maxJumpContext}`,
+  );
   report.maxCameraJump = maxJump;
   report.randomTicks = 1200 * 12 + 360;
 }
 
 async function main() {
   const seed = Number(readOption("--seed", "20260923"));
+  const scenario = readOption("--scenario", "all");
+  assert(
+    scenario === "all" ||
+      scenario === "role-aware-presentation" ||
+      scenario === "franklin-presentation",
+    `Unknown scenario: ${scenario}`,
+  );
+  rmSync(EVIDENCE_DIR, { force: true, recursive: true });
+  mkdirSync(EVIDENCE_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
@@ -500,12 +856,21 @@ async function main() {
         window.__fightSnapshot?.().rigs?.length === 2,
       ),
     );
-    await runMovement(page, report);
-    await runCameraControls(page, report);
-    await runCombat(page, report);
-    await runWarburgPowers(page, report);
-    await koRoundMatchAndRestart(page, report);
-    await runInputStress(page, report, seed);
+    if (scenario === "role-aware-presentation") {
+      await runRoleAwarePresentation(page, report);
+    } else if (scenario === "franklin-presentation") {
+      await runFranklinPresentation(page, report);
+    } else {
+      await runMovement(page, report);
+      await runCameraControls(page, report);
+      await runCombat(page, report);
+      await runWarburgPowers(page, report);
+      await runCurieMatchRule(page, report);
+      await runRoleAwarePresentation(page, report);
+      await runFranklinPresentation(page, report);
+      await koRoundMatchAndRestart(page, report);
+      await runInputStress(page, report, seed);
+    }
     assert(errors.length === 0, `browser console errors: ${errors.join(" | ")}`);
     const output = { ...report, states: [...report.states].sort(), errors };
     console.log(JSON.stringify(output));

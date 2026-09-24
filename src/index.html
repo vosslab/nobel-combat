@@ -3,19 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Otto Warburg vs AI | Nobel Combat</title>
+    <title>Nobel Combat</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <main>
-      <canvas id="game" aria-label="3D arena with Otto Warburg and the AI opponent"></canvas>
+      <canvas id="game" aria-label="3D Nobel Combat arena" tabindex="-1"></canvas>
       <div class="hud">
-        <section aria-label="Otto Warburg status">
-          <strong>OTTO WARBURG</strong>
+        <section id="red-status" aria-label="Otto Heinrich Warburg status">
+          <strong id="red-name">OTTO HEINRICH WARBURG</strong>
           <div
             class="health"
             role="progressbar"
-            aria-label="Red health"
+            aria-label="Otto Heinrich Warburg health"
             aria-valuemin="0"
             aria-valuemax="100"
             aria-valuenow="100"
@@ -25,12 +25,12 @@
           <span id="red-wins">Wins 0</span>
         </section>
         <div id="status" role="status" aria-live="polite">ROUND 1</div>
-        <section class="blue" aria-label="AI opponent status">
-          <strong>AI OPPONENT</strong>
+        <section id="blue-status" class="blue" aria-label="Marie Curie AI status">
+          <strong id="blue-name">MARIE CURIE AI</strong>
           <div
             class="health"
             role="progressbar"
-            aria-label="Blue health"
+            aria-label="Marie Curie AI health"
             aria-valuemin="0"
             aria-valuemax="100"
             aria-valuenow="100"
@@ -40,14 +40,61 @@
           <span id="blue-wins">Wins 0</span>
         </section>
       </div>
-      <div class="help">
-        WASD move &nbsp; J light &nbsp; K Oxygen Transfer &nbsp; L block &nbsp; J+K Lactate Drive
-        &nbsp; J+L Aerobic Glycolysis &nbsp; R restart<br />
-        Q/E orbit &nbsp; Page Up/Down tilt &nbsp; [/] zoom &nbsp; drag and wheel view<br />
-        Gamepad: left stick/D-pad move &nbsp; right stick view &nbsp; east Oxygen Transfer &nbsp;
-        south light &nbsp; south+east Lactate Drive &nbsp; south+right shoulder Aerobic Glycolysis
-        &nbsp; right shoulder block &nbsp; Start restart
+      <div id="move-indicator" class="move-indicator" hidden>
+        <span id="move-name"></span>
+        <span class="move-meter" aria-hidden="true"><span id="move-meter-fill"></span></span>
       </div>
+      <div id="curie-indicator" class="curie-indicator" aria-label="Curie research cue" hidden>
+        <strong>SEPARATION STEP</strong>
+        <span>FRACTION / ACTIVITY</span>
+        <span class="curie-meter" aria-hidden="true"><span id="curie-meter-fill"></span></span>
+      </div>
+      <div
+        id="franklin-unlock-announcement"
+        class="visually-hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></div>
+      <dialog
+        id="fighter-select"
+        class="fighter-select"
+        aria-labelledby="fighter-select-title"
+        aria-describedby="fighter-select-help"
+      >
+        <h1 id="fighter-select-title">Choose your fighter</h1>
+        <p id="fighter-select-help">
+          Select Otto Heinrich Warburg or Marie Curie. The other fighter is controlled by the AI.
+        </p>
+        <fieldset id="fighter-choices">
+          <legend>Player fighter</legend>
+          <label class="fighter-choice" for="select-warburg">
+            <input id="select-warburg" name="fighter" type="radio" value="warburg" checked />
+            <span
+              ><strong>Otto Heinrich Warburg</strong
+              ><small>Oxygen Transfer and metabolic pressure</small></span
+            >
+          </label>
+          <label class="fighter-choice" for="select-curie">
+            <input id="select-curie" name="fighter" type="radio" value="curie" />
+            <span
+              ><strong>Marie Curie</strong><small>Separation Step and measured timing</small></span
+            >
+          </label>
+        </fieldset>
+        <button id="start-match" class="start-match" type="button">Begin match</button>
+        <p class="selection-controls">
+          Left/right or A/D selects. Enter, Space, gamepad south, or Start begins.
+        </p>
+      </dialog>
+      <aside class="help" aria-label="Controls">
+        <span id="player-move-help"></span><br />
+        Q/E orbit &nbsp; Page Up/Down tilt &nbsp; [/] zoom &nbsp; drag and wheel view<br />
+        <span id="gamepad-move-help"></span>
+      </aside>
+      <button id="change-fighter" class="change-fighter" type="button" hidden>
+        Change fighter
+      </button>
       <button id="restart" type="button">Restart match</button>
     </main>
     <script type="module" src="main.js"></script>
