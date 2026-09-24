@@ -160,6 +160,16 @@ test("Aerobic Glycolysis opens a bounded output window and powers the next conne
   assert.equal(powered.fighters[1].ticks, 14);
   assert.equal(powered.fighters[0].aerobicLightReady, false);
 
+  const blocked = new Match();
+  blocked.fighters[0].x = 0;
+  blocked.fighters[1].x = 1.5;
+  blocked.tick([aerobicGlycolysis, { ...NEUTRAL, block: true }]);
+  blocked.tick([NEUTRAL, { ...NEUTRAL, block: true }]);
+  blocked.tick([light, { ...NEUTRAL, block: true }]);
+  run(blocked, 7, NEUTRAL, { ...NEUTRAL, block: true });
+  assert.equal(blocked.fighters[1].hp, 96, "a powered light deals four damage through held block");
+  assert.equal(blocked.fighters[0].aerobicLightReady, false, "blocked contact consumes the boost");
+
   const expired = new Match();
   expired.tick([aerobicGlycolysis, NEUTRAL]);
   run(expired, 71);
@@ -169,4 +179,15 @@ test("Aerobic Glycolysis opens a bounded output window and powers the next conne
   assert.equal(expired.fighters[0].aerobicOutputTicks, 0);
   assert.equal(expired.fighters[0].aerobicLightReady, false);
   assert.equal(expired.fighters[0].aerobicGlycolysisCooldown, 78);
+
+  const reset = new Match();
+  reset.fighters[0].lactateDriveCooldown = 12;
+  reset.fighters[0].aerobicOutputTicks = 22;
+  reset.fighters[0].aerobicGlycolysisCooldown = 44;
+  reset.fighters[0].aerobicLightReady = true;
+  reset.restart();
+  assert.equal(reset.fighters[0].lactateDriveCooldown, 0);
+  assert.equal(reset.fighters[0].aerobicOutputTicks, 0);
+  assert.equal(reset.fighters[0].aerobicGlycolysisCooldown, 0);
+  assert.equal(reset.fighters[0].aerobicLightReady, false);
 });

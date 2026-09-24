@@ -96,6 +96,10 @@ function assertValid(snapshot, label) {
   assert(["fight", "roundOver", "matchOver"].includes(snapshot.phase), `${label}: invalid phase`);
   assert(Number.isInteger(snapshot.round) && snapshot.round >= 1, `${label}: invalid round`);
   for (const fighter of snapshot.fighters) {
+    assert(
+      fighter.role === "warburg" || fighter.role === "opponent",
+      `${label}: unknown fighter role`,
+    );
     assert(states.has(fighter.state), `${label}: invalid fighter state ${fighter.state}`);
     assert(
       Number.isFinite(fighter.x) && Number.isFinite(fighter.z),
@@ -107,6 +111,29 @@ function assertValid(snapshot, label) {
       `${label}: invalid health`,
     );
     assert(Number.isFinite(fighter.facing), `${label}: nonfinite facing`);
+    assert(
+      Number.isInteger(fighter.lactateDriveCooldown) &&
+        fighter.lactateDriveCooldown >= 0 &&
+        fighter.lactateDriveCooldown <= 44,
+      `${label}: invalid Lactate Drive cooldown`,
+    );
+    assert(
+      Number.isInteger(fighter.aerobicOutputTicks) &&
+        fighter.aerobicOutputTicks >= 0 &&
+        fighter.aerobicOutputTicks <= 72,
+      `${label}: invalid Aerobic Glycolysis output timer`,
+    );
+    assert(
+      Number.isInteger(fighter.aerobicGlycolysisCooldown) &&
+        fighter.aerobicGlycolysisCooldown >= 0 &&
+        fighter.aerobicGlycolysisCooldown <= 150,
+      `${label}: invalid Aerobic Glycolysis cooldown`,
+    );
+    assert(!fighter.lactateDrive || fighter.state === "light", `${label}: orphaned drive state`);
+    assert(
+      !fighter.aerobicLightReady || fighter.aerobicOutputTicks > 0,
+      `${label}: expired powered-light charge`,
+    );
   }
   const camera = snapshot.camera;
   assert(
@@ -220,7 +247,7 @@ async function runCombat(page, report) {
   await advance(page, 1, action(0, 0, false, true));
   state = await advance(page, 14);
   assert(
-    state.fighters[BLUE].hp === 76 && state.fighters[BLUE].state === "down",
+    state.fighters[BLUE].hp === 72 && state.fighters[BLUE].state === "down",
     "heavy attack did not knock down",
   );
   report.states.add("heavy");
@@ -231,6 +258,79 @@ async function runCombat(page, report) {
   assert(state.fighters[BLUE].state === "idle", "getup did not recover");
   report.states.add("getup");
   assertValid(state, "combat");
+}
+
+async function runWarburgPowers(page, report) {
+  await restart(page);
+  await forceFighter(page, RED, { x: 0, z: 0 });
+  await forceFighter(page, BLUE, { x: 2.6, z: 0 });
+  let state = await advance(page, 1, action(0, 0, true, true));
+  assert(
+    state.fighters[RED].lactateDrive && state.fighters[RED].lactateDriveCooldown === 44,
+    "Lactate Drive chord did not start with its cooldown",
+  );
+  state = await advance(page, 9);
+  assert(Math.abs(state.fighters[RED].x - 0.648) < 1e-8, "Lactate Drive startup distance drift");
+  assert(state.fighters[BLUE].hp === 100, "Lactate Drive hit before its ten-tick startup");
+  state = await advance(page, 1);
+  assert(
+    state.fighters[BLUE].hp === 82 && state.fighters[BLUE].ticks === 14,
+    "Lactate Drive did not apply its one hit and 14-tick stun",
+  );
+  report.moves = ["Lactate Drive"];
+
+  await restart(page);
+  await forceFighter(page, RED, { x: 0, z: 0 });
+  await forceFighter(page, BLUE, { x: 2.6, z: 0 });
+  await advance(page, 1, action(0, 0, true, true), action(0, 0, false, false, true));
+  state = await advance(page, 10, NEUTRAL, action(0, 0, false, false, true));
+  assert(
+    state.fighters[BLUE].hp === 96 && state.fighters[BLUE].state === "block",
+    "held block did not reduce Lactate Drive to four damage",
+  );
+
+  await restart(page);
+  await forceFighter(page, RED, { x: 0, z: 0 });
+  await forceFighter(page, BLUE, { x: 1.5, z: 0 });
+  state = await advance(page, 1, action(0, 0, true, false, true));
+  assert(
+    state.fighters[RED].aerobicOutputTicks === 72 &&
+      state.fighters[RED].aerobicGlycolysisCooldown === 150 &&
+      state.fighters[RED].aerobicLightReady,
+    "Aerobic Glycolysis chord did not start its output window",
+  );
+  state = await advance(page, 71);
+  assert(state.fighters[RED].aerobicOutputTicks === 1, "output timer lost a tick");
+  state = await advance(page, 1);
+  assert(
+    state.fighters[RED].aerobicOutputTicks === 0 && !state.fighters[RED].aerobicLightReady,
+    "output window or powered-light charge failed to expire",
+  );
+  report.moves.push("Aerobic Glycolysis");
+
+  await restart(page);
+  await forceFighter(page, RED, { x: 0, z: 0 });
+  await forceFighter(page, BLUE, { x: 8, z: 0 });
+  await advance(page, 1, action(0, 0, true, false, true));
+  await advance(page, 1);
+  state = await advance(page, 1, action(1, 0));
+  assert(Math.abs(state.fighters[RED].x - 0.115) < 1e-8, "output movement speed did not increase");
+
+  await restart(page);
+  await forceFighter(page, RED, { x: 0, z: 0 });
+  await forceFighter(page, BLUE, { x: 1.5, z: 0 });
+  await advance(page, 1, action(0, 0, true, false, true));
+  await advance(page, 1);
+  state = await advance(page, 1, action(0, 0, true));
+  assert(state.fighters[RED].state === "light", "powered light failed to start");
+  state = await advance(page, 7);
+  assert(
+    state.fighters[BLUE].hp === 86 &&
+      state.fighters[BLUE].ticks === 14 &&
+      !state.fighters[RED].aerobicLightReady,
+    "Aerobic Glycolysis did not power and consume the next successful light",
+  );
+  assertValid(state, "Warburg research powers");
 }
 
 function cameraDistance(before, after) {
@@ -385,6 +485,7 @@ async function main() {
   const report = {
     seed,
     crossings: 0,
+    moves: [],
     maxDistance: 0,
     maxCameraJump: 0,
     randomTicks: 0,
@@ -402,6 +503,7 @@ async function main() {
     await runMovement(page, report);
     await runCameraControls(page, report);
     await runCombat(page, report);
+    await runWarburgPowers(page, report);
     await koRoundMatchAndRestart(page, report);
     await runInputStress(page, report, seed);
     assert(errors.length === 0, `browser console errors: ${errors.join(" | ")}`);

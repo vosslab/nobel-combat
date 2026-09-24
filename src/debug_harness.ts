@@ -151,7 +151,7 @@ function copyFighter(fighter: Fighter): DebugFighterSnapshot {
 function validateFighter(fighter: Fighter): void {
   validateAllowedKeys(fighter, FIGHTER_FIELDS, "fighter");
   if (fighter.role !== "warburg" && fighter.role !== "opponent") {
-    throw new Error(`Unknown fighter role: ${fighter.role}`);
+    throw new Error(`Unknown fighter role: ${String(fighter.role)}`);
   }
   validateNumber("Fighter x", fighter.x, -9, 9);
   validateNumber("Fighter z", fighter.z, -6, 6);

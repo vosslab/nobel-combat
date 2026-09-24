@@ -27,14 +27,14 @@ for the respiratory enzyme; do not imply it was awarded for a cancer theory or t
 
 ## Milestones
 
-| Milestone | Owner | Outcome | Automated validation |
-| --- | --- | --- | --- |
-| W1 | Asset integration | Complete: Red is the rigged scientist; Blue remains the generic AI opponent. | Local build and browser fixture confirm both models, independent skeletons, state clips, and no console errors. |
-| W2 | Warburg combat | Complete: Oxygen Transfer is faster, stronger, and longer than the standard AI heavy. | Deterministic checks prove faster startup, 28/6 damage, 2.45 reach, 72-tick knockdown, held-block behavior, and unchanged AI values. |
-| W3 | Research powers | Add distinct Lactate Drive and Aerobic Glycolysis rules without a generic ability framework. | Fixed-tick checks cover action chords, reach, movement, damage, block, cooldown, output-window expiry, charge use, and keyboard/gamepad parity. |
-| W4 | Fighter presentation | Name Warburg in the HUD and connect each move to readable rig animation and sourced visual cues. | Forced-state browser capture checks animation, cue timing, screen bounds, and Match/presentation separation. |
-| W5 | First-fighter acceptance | Run complete Warburg-vs-AI matches, endurance, and repository gates. | Full browser suite covers both win paths, all moves, restart, crossings, max separation, and zero browser errors. |
-| W6 | Roster handoff | Record the smallest next milestone for additional Nobel fighters and Franklin's secret unlock. | Plan identifies source evidence, asset path, concrete owner, and no-human validation for the next fighter. |
+| Milestone | Owner                    | Outcome                                                                                          | Automated validation                                                                                                                            |
+| --------- | ------------------------ | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| W1        | Asset integration        | Complete: Red is the rigged scientist; Blue remains the generic AI opponent.                     | Local build and browser fixture confirm both models, independent skeletons, state clips, and no console errors.                                 |
+| W2        | Warburg combat           | Complete: Oxygen Transfer is faster, stronger, and longer than the standard AI heavy.            | Deterministic checks prove faster startup, 28/6 damage, 2.45 reach, 72-tick knockdown, held-block behavior, and unchanged AI values.            |
+| W3        | Research powers          | Add distinct Lactate Drive and Aerobic Glycolysis rules without a generic ability framework.     | Fixed-tick checks cover action chords, reach, movement, damage, block, cooldown, output-window expiry, charge use, and keyboard/gamepad parity. |
+| W4        | Fighter presentation     | Name Warburg in the HUD and connect each move to readable rig animation and sourced visual cues. | Forced-state browser capture checks animation, cue timing, screen bounds, and Match/presentation separation.                                    |
+| W5        | First-fighter acceptance | Run complete Warburg-vs-AI matches, endurance, and repository gates.                             | Full browser suite covers both win paths, all moves, restart, crossings, max separation, and zero browser errors.                               |
+| W6        | Roster handoff           | Record the smallest next milestone for additional Nobel fighters and Franklin's secret unlock.   | Plan identifies source evidence, asset path, concrete owner, and no-human validation for the next fighter.                                      |
 
 ## W1: Scientist model (complete)
 

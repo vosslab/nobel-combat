@@ -172,9 +172,9 @@ export class Match {
       ? f.ticks <= 23 && f.ticks >= 16
       : lactateDrive
         ? f.ticks <= 6 && f.ticks >= 1
-      : heavy
-        ? f.ticks <= 22 && f.ticks >= 15
-        : f.ticks <= 15 && f.ticks >= 10;
+        : heavy
+          ? f.ticks <= 22 && f.ticks >= 15
+          : f.ticks <= 15 && f.ticks >= 10;
     if (!active) return false;
     f.hitDone = true;
     const dx = target.x - f.x;
@@ -188,10 +188,7 @@ export class Match {
     )
       return false;
     const blocked = target.state === "block";
-    const poweredLight = !heavy &&
-      !lactateDrive &&
-      f.role === "warburg" &&
-      f.aerobicLightReady;
+    const poweredLight = !heavy && !lactateDrive && f.role === "warburg" && f.aerobicLightReady;
     const damage = oxygenTransfer
       ? blocked
         ? 6
@@ -211,12 +208,17 @@ export class Match {
             : blocked
               ? 2
               : 10;
-    target.hp = Math.max(
-      0,
-      target.hp - damage,
-    );
+    target.hp = Math.max(0, target.hp - damage);
     target.state = blocked ? "block" : heavy ? "down" : "hit";
-    target.ticks = blocked ? 8 : heavy ? (oxygenTransfer ? 72 : 70) : lactateDrive || poweredLight ? 14 : 18;
+    target.ticks = blocked
+      ? 8
+      : heavy
+        ? oxygenTransfer
+          ? 72
+          : 70
+        : lactateDrive || poweredLight
+          ? 14
+          : 18;
     target.lactateDrive = false;
     if (poweredLight) f.aerobicLightReady = false;
     const knockback = heavy ? 0.65 : lactateDrive ? 0.4 : 0.25;

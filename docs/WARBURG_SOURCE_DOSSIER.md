@@ -22,9 +22,9 @@ about cancer treatment.
 - In his 1956 paper "On the Origin of Cancer Cells," Warburg reported respiration and lactic-acid
   fermentation measurements for cancer cells, including measurements at oxygen saturation. That
   supports a symbolic aerobic-glycolysis move, while his broader causal account of cancer remains a
-  historical hypothesis rather than the game's medical claim. [Warburg, *Science* 123 (1956),
+  historical hypothesis rather than the game's medical claim. [Warburg, _Science_ 123 (1956),
   309-314](https://doi.org/10.1126/science.123.3191.309)
-- His 1914 paper, *Uber die Rolle des Eisens in der Atmung des Seeigeleis*, documents an earlier
+- His 1914 paper, _Uber die Rolle des Eisens in der Atmung des Seeigeleis_, documents an earlier
   investigation of iron's role in sea-urchin-egg respiration. [Heidelberg Academy digitization of
   Warburg (1914)](https://doi.org/10.11588/diglit.34096#0010)
 - Warburg continued publishing manometric methods late in his career, including a two-vessel method
@@ -76,5 +76,5 @@ Two further moves use Warburg's reported respiration and lactic-acid fermentatio
 cancer cells, including at oxygen saturation. **Lactate Drive** is a short forward rush followed by
 a jab. **Aerobic Glycolysis** opens a brief movement and next-light window. These are deliberately
 simple game metaphors; they do not model tumor biology, imply that lactate powers movement, or claim
-a therapeutic effect. [Warburg, *Science* 123 (1956), 309-314]
+a therapeutic effect. [Warburg, _Science_ 123 (1956), 309-314]
 (https://doi.org/10.1126/science.123.3191.309)

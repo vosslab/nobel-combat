@@ -22,6 +22,11 @@
 - Integrated the vendored CC0 Mesh2Motion `doctor_m` scientist model for Otto Warburg while keeping
   `male_5` as the independently animated AI opponent. The HUD and browser identity now name the
   Warburg-versus-AI match.
+- Made Warburg's Oxygen Transfer heavy faster and stronger than the standard AI heavy, and added
+  fixed-tick Lactate Drive and Aerobic Glycolysis moves with explicit cooldown and controller-chord
+  rules. Combat remains independent of rendering.
+- Corrected hit resolution so a newly struck fighter receives the full hit-stun or knockdown duration
+  regardless of fighter update order.
 - Added the complete CC0 1.0 legal text and mapped source code and vendored Mesh2Motion assets to
   their respective licenses from the root README.
 
