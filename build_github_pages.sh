@@ -37,7 +37,11 @@ else
 fi
 
 # Verify required static assets before any destructive step.
-for required in src/index.html src/style.css; do
+for required in \
+	src/index.html \
+	src/style.css \
+	assets/models/quaternius_superhero_male_fullbody.glb \
+	assets/animations/quaternius_combat.glb; do
 	if [ ! -f "$required" ]; then
 		echo "ERROR: required source file missing: $required" >&2
 		case "$required" in
@@ -73,9 +77,14 @@ npx esbuild "$ENTRY" \
 
 cp src/index.html dist/index.html
 cp src/style.css dist/style.css
+mkdir -p dist/assets/models dist/assets/animations
+cp assets/models/quaternius_superhero_male_fullbody.glb dist/assets/models/
+cp assets/animations/quaternius_combat.glb dist/assets/animations/
 touch dist/.nojekyll
 
 test -f dist/index.html
 test -f dist/main.js
+test -s dist/assets/models/quaternius_superhero_male_fullbody.glb
+test -s dist/assets/animations/quaternius_combat.glb
 
 echo "Built dist/ (GitHub Pages-ready)."

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Red Dummy vs Blue Dummy</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <canvas id="game" aria-label="3D arena with Red Dummy and Blue Dummy"></canvas>
+      <div class="hud">
+        <section aria-label="Red Dummy status">
+          <strong>RED DUMMY</strong>
+          <div
+            class="health"
+            role="progressbar"
+            aria-label="Red health"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="100"
+          >
+            <div id="red-health"></div>
+          </div>
+          <span id="red-wins">Wins 0</span>
+        </section>
+        <div id="status" role="status" aria-live="polite">ROUND 1</div>
+        <section class="blue" aria-label="Blue Dummy status">
+          <strong>BLUE DUMMY</strong>
+          <div
+            class="health"
+            role="progressbar"
+            aria-label="Blue health"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="100"
+          >
+            <div id="blue-health"></div>
+          </div>
+          <span id="blue-wins">Wins 0</span>
+        </section>
+      </div>
+      <div class="help">
+        WASD move &nbsp; J light &nbsp; K heavy &nbsp; L block &nbsp; R restart<br />
+        Q/E orbit &nbsp; Page Up/Down tilt &nbsp; [/] zoom &nbsp; drag and wheel view<br />
+        Gamepad: left stick/D-pad move &nbsp; right stick view &nbsp; south/east attack &nbsp; right
+        shoulder block &nbsp; Start restart
+      </div>
+      <button id="restart" type="button">Restart match</button>
+    </main>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

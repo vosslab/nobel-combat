@@ -1,0 +1,56 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { Match, NEUTRAL } from "../src/match.ts";
+const light = { ...NEUTRAL, light: true };
+const heavy = { ...NEUTRAL, heavy: true };
+function run(match, count, red = NEUTRAL, blue = NEUTRAL) {
+  for (let i = 0; i < count; i++) match.tick([red, blue]);
+}
+test("light hits once and block reduces damage", () => {
+  const m = new Match();
+  m.fighters[0].x = -0.8;
+  m.fighters[1].x = 0.8;
+  m.tick([light, NEUTRAL]);
+  run(m, 22);
+  assert.equal(m.fighters[1].hp, 90);
+  m.restart();
+  m.fighters[0].x = -0.8;
+  m.fighters[1].x = 0.8;
+  m.tick([NEUTRAL, { ...NEUTRAL, block: true }]);
+  m.tick([light, { ...NEUTRAL, block: true }]);
+  run(m, 22, NEUTRAL, { ...NEUTRAL, block: true });
+  assert.equal(m.fighters[1].hp, 98);
+});
+test("heavy knockdown, KO, next round, and restart", () => {
+  const m = new Match();
+  m.fighters[0].x = -0.8;
+  m.fighters[1].x = 0.8;
+  m.tick([heavy, NEUTRAL]);
+  run(m, 16);
+  assert.equal(m.fighters[1].state, "down");
+  run(m, 70);
+  assert.equal(m.fighters[1].state, "getup");
+  run(m, 18);
+  assert.equal(m.fighters[1].state, "idle");
+  m.restart();
+  m.fighters[0].x = -0.8;
+  m.fighters[1].x = 0.8;
+  m.fighters[1].hp = 20;
+  m.tick([heavy, NEUTRAL]);
+  run(m, 16);
+  assert.equal(m.phase, "roundOver");
+  assert.equal(m.fighters[0].wins, 1);
+  run(m, 120);
+  assert.equal(m.round, 2);
+  assert.equal(m.fighters[1].hp, 100);
+  m.fighters[0].x = -0.8;
+  m.fighters[1].x = 0.8;
+  m.fighters[1].hp = 20;
+  m.tick([heavy, NEUTRAL]);
+  run(m, 16);
+  assert.equal(m.phase, "matchOver");
+  m.restart();
+  assert.equal(m.phase, "fight");
+  assert.equal(m.round, 1);
+  assert.equal(m.fighters[0].wins, 0);
+});
