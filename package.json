@@ -7,7 +7,7 @@
 		"setup": "./devel/setup_typescript.sh",
 		"setup:playwright": "./devel/setup_playwright.sh",
 		"check": "./check_codebase.sh",
-		"clean": "./dist_clean.sh",
+		"clean": "./devel/clean_build.sh",
 		"format:write": "npx prettier --write --ignore-path .gitignore --ignore-path .prettierignore --ignore-path .prettierignore.local '**/*.{ts,tsx,mts,cts,js,mjs,cjs}'",
 		"test:playwright": "npx playwright test"
 	},
@@ -25,12 +25,11 @@
 		"typescript-eslint": ">=8.62.1"
 	},
 	"allowScripts": {
-		"esbuild@0.28.1": true,
-		"fsevents@2.3.2": true,
-		"fsevents@2.3.3": true
+		"esbuild": true,
+		"fsevents": true
 	},
 	"dependencies": {
-		"@babylonjs/core": "^9.27.1",
-		"@babylonjs/loaders": "^9.27.1"
+		"@babylonjs/core": ">=9.27.1",
+		"@babylonjs/loaders": ">=9.27.1"
 	}
 }
