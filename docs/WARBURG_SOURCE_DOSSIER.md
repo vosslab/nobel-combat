@@ -46,17 +46,18 @@ injury effect.
 
 ## Concrete combat motif
 
-Replace only the inherited dummy heavy-attack presentation with **Oxygen Transfer**: during the
-current heavy startup, the forearm gauge needle swings and a brief iron-red pulse runs up the glass
-tube. On the existing heavy hit frame, a short red-white ring flashes at the opponent's chest. The
-attack keeps the dummy fight's current hit volume, damage, knockdown, recovery, and one-hit-per-
-swing rule.
+Warburg's **Oxygen Transfer** replaces his standard heavy attack. It starts faster (32 rather than
+36 ticks), reaches 2.45 rather than 2.2 arena units, deals 28 rather than 24 damage (6 rather than
+5 through a held block), and holds an unblocked target down for 72 rather than 70 ticks. Its first
+contact frame arrives after eight simulation advances; one hit per swing and the standard arena
+bounds still apply. The AI's heavy remains unchanged. These are explicit game-balance choices; the
+historical research does not confer a real-world fighting ability.
 
-This makes the heavy attack readable as a measured catalytic event while preserving the established
-combat contract. It needs a fighter-specific animation and material cue only; it does not add meter,
-status effects, resource rules, or a reusable abilities framework. The iron/oxygen-transfer language
-comes from Warburg's own 1931 account. [Warburg Nobel lecture
-(1931)](https://www.nobelprize.org/uploads/2018/06/warburg-lecture.pdf)
+During startup, the forearm gauge needle swings and a brief iron-red pulse runs up the glass tube.
+On contact, a short red-white ring flashes at the opponent's chest. This makes the move readable as
+a measured catalytic event without introducing meter, status effects, or a reusable abilities
+framework. The iron/oxygen-transfer language comes from Warburg's own 1931 account. [Warburg Nobel
+lecture (1931)](https://www.nobelprize.org/uploads/2018/06/warburg-lecture.pdf)
 
 ## Evidence limits
 
@@ -68,3 +69,12 @@ comes from Warburg's own 1931 account. [Warburg Nobel lecture
 - The Nobel prize citation concerns the respiratory enzyme. Avoid presenting it as a Nobel award for
   the later-named "Warburg effect" or for cancer treatment. [Nobel Prize 1931
   summary](https://www.nobelprize.org/prizes/medicine/1931/summary/)
+
+## Research-motif powers
+
+Two further moves use Warburg's reported respiration and lactic-acid fermentation measurements in
+cancer cells, including at oxygen saturation. **Lactate Drive** is a short forward rush followed by
+a jab. **Aerobic Glycolysis** opens a brief movement and next-light window. These are deliberately
+simple game metaphors; they do not model tumor biology, imply that lactate powers movement, or claim
+a therapeutic effect. [Warburg, *Science* 123 (1956), 309-314]
+(https://doi.org/10.1126/science.123.3191.309)

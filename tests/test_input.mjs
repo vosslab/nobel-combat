@@ -29,6 +29,16 @@ test("keyboard and standard gamepad controls have action parity", () => {
     mapPlayerInput(keys("KeyS"), null, 0).action,
     mapPlayerInput(new Set(), pad({ buttons: at(13) }), 0).action,
   );
+  assert.deepEqual(
+    mapPlayerInput(keys("KeyJ", "KeyK"), null, 0).action,
+    mapPlayerInput(new Set(), pad({ buttons: at(0, 1) }), 0).action,
+    "J+K and south+east must map to the same Lactate Drive chord",
+  );
+  assert.deepEqual(
+    mapPlayerInput(keys("KeyJ", "KeyL"), null, 0).action,
+    mapPlayerInput(new Set(), pad({ buttons: at(0, 5) }), 0).action,
+    "J+L and south+right-shoulder must map to the same Aerobic Glycolysis chord",
+  );
 });
 
 test("movement is camera-relative, diagonal-normalized, and finite", () => {

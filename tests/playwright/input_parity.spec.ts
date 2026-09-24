@@ -43,6 +43,8 @@ const actionCases: InputCase[] = [
   { label: "light", keys: ["KeyJ"], pad: pad(undefined, [0]) },
   { label: "heavy", keys: ["KeyK"], pad: pad(undefined, [1]) },
   { label: "block", keys: ["KeyL"], pad: pad(undefined, [5]) },
+  { label: "Lactate Drive", keys: ["KeyJ", "KeyK"], pad: pad(undefined, [0, 1]) },
+  { label: "Aerobic Glycolysis", keys: ["KeyJ", "KeyL"], pad: pad(undefined, [0, 5]) },
   { label: "restart", keys: ["KeyR"], pad: pad(undefined, [9]) },
   {
     label: "light-heavy-block",

@@ -29,14 +29,14 @@ for the respiratory enzyme; do not imply it was awarded for a cancer theory or t
 
 | Milestone | Owner | Outcome | Automated validation |
 | --- | --- | --- | --- |
-| W1 | Asset integration | Red is the rigged scientist; Blue remains the generic AI opponent. | Local build and browser fixture confirm both models, independent skeletons, state clips, and no console errors. |
-| W2 | Warburg combat | Add one explicit stronger signature move tied to respiratory-enzyme/oxygen-transfer research. | Deterministic checks prove Warburg's damage/reach advantage and preserve one hit per attack, block, recovery, and round rules. |
-| W3 | Research powers | Add concrete, distinct moves for tumor metabolism and aerobic glycolysis without a generic ability framework. | Fixed-seed combat traces exercise each move, cooldown/availability limits, opponent responses, and state invariants. |
+| W1 | Asset integration | Complete: Red is the rigged scientist; Blue remains the generic AI opponent. | Local build and browser fixture confirm both models, independent skeletons, state clips, and no console errors. |
+| W2 | Warburg combat | Complete: Oxygen Transfer is faster, stronger, and longer than the standard AI heavy. | Deterministic checks prove faster startup, 28/6 damage, 2.45 reach, 72-tick knockdown, held-block behavior, and unchanged AI values. |
+| W3 | Research powers | Add distinct Lactate Drive and Aerobic Glycolysis rules without a generic ability framework. | Fixed-tick checks cover action chords, reach, movement, damage, block, cooldown, output-window expiry, charge use, and keyboard/gamepad parity. |
 | W4 | Fighter presentation | Name Warburg in the HUD and connect each move to readable rig animation and sourced visual cues. | Forced-state browser capture checks animation, cue timing, screen bounds, and Match/presentation separation. |
 | W5 | First-fighter acceptance | Run complete Warburg-vs-AI matches, endurance, and repository gates. | Full browser suite covers both win paths, all moves, restart, crossings, max separation, and zero browser errors. |
 | W6 | Roster handoff | Record the smallest next milestone for additional Nobel fighters and Franklin's secret unlock. | Plan identifies source evidence, asset path, concrete owner, and no-human validation for the next fighter. |
 
-## W1: Scientist model
+## W1: Scientist model (complete)
 
 **Success condition.** Load vendored `doctor_m` for Warburg and `male_5` for the AI from local files.
 Both instances remain independently animated by the existing clips and follow the current fighter
@@ -46,20 +46,26 @@ positions. The HUD identifies the scientist and opponent.
 rejects its transforms, repair the local asset integration without replacing the model with
 procedural character geometry.
 
-## W2: Stronger signature move
+## W2: Stronger signature move (complete)
 
-**Success condition.** Give Warburg one stronger, named Oxygen Transfer attack while preserving
-bounded deterministic hit timing, blocking, one hit per swing, knockdown, and recovery. This direct
-character rule is the first demonstrated need for fighter-specific combat data.
+**Success condition.** Warburg's existing heavy input launches a named Oxygen Transfer attack with
+32 total ticks, active ticks 23 through 16 remaining, 28 unblocked / 6 held-block damage, 2.45 reach,
+and 72-tick knockdown. The standard AI heavy remains 36 ticks, active ticks 22 through 15, 24 / 5
+damage, 2.2 reach, and 70-tick knockdown. One-hit-per-swing and round rules remain fixed-tick.
 
 **Recovery.** Keep the change inside the concrete Warburg/opponent match contract. Do not buff the
 opponent or all heavy attacks to simulate Warburg's strength.
 
 ## W3: Metabolism powers
 
-**Success condition.** Add one concrete mechanic based on tumor metabolism and one based on aerobic
-glycolysis. State rules stay small, fixed-tick, and testable. Visual metaphors do not claim to model
-cancer biology or treatment.
+**Success condition.** `J+K` (standard gamepad south+east) triggers Lactate Drive: 16 total ticks,
+0.72 units of forward movement during 10 startup ticks, a six-tick active window at 2.0 range, 18
+damage / 4 through block, 14-tick hit stun, and a 44-tick cooldown. `J+L` (south+right shoulder)
+triggers Aerobic Glycolysis: a 72-tick output window and 150-tick cooldown; movement rises from
+0.095 to 0.115 units per tick, and the next ordinary light that connects during the window deals 14
+damage / 4 through block and 14-tick stun. A blocked contact consumes the light boost. Neither move
+heals or stacks. Tests verify each rule and controller parity. They are bounded game metaphors, not
+claims about cancer mechanism or treatment.
 
 **Recovery.** Prefer adapting existing input/state paths. Add a new input or state only when it is
 required by the move design; test keyboard and standard-gamepad parity.

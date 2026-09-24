@@ -24,6 +24,7 @@ const STATES: readonly State[] = [
 ];
 const PHASES: readonly Phase[] = ["fight", "roundOver", "matchOver"];
 const FIGHTER_FIELDS: ReadonlySet<string> = new Set([
+  "role",
   "x",
   "z",
   "hp",
@@ -33,6 +34,11 @@ const FIGHTER_FIELDS: ReadonlySet<string> = new Set([
   "ticks",
   "hitDone",
   "attackHeld",
+  "lactateDrive",
+  "lactateDriveCooldown",
+  "aerobicOutputTicks",
+  "aerobicGlycolysisCooldown",
+  "aerobicLightReady",
 ]);
 const MATCH_FIELDS: ReadonlySet<string> = new Set(["phase", "round", "winner", "phaseTicks"]);
 const ACTION_FIELDS: ReadonlySet<string> = new Set(["x", "z", "light", "heavy", "block"]);
@@ -43,7 +49,7 @@ const STATE_TICK_LIMITS: Readonly<Record<State, readonly [number, number]>> = {
   heavy: [1, 36],
   block: [0, 8],
   hit: [1, 18],
-  down: [1, 70],
+  down: [1, 72],
   getup: [1, 18],
 };
 
@@ -123,6 +129,7 @@ function copyAction(action: Action): Action {
 
 function copyFighter(fighter: Fighter): DebugFighterSnapshot {
   const copied = {
+    role: fighter.role,
     x: fighter.x,
     z: fighter.z,
     hp: fighter.hp,
@@ -132,12 +139,20 @@ function copyFighter(fighter: Fighter): DebugFighterSnapshot {
     ticks: fighter.ticks,
     hitDone: fighter.hitDone,
     attackHeld: fighter.attackHeld,
+    lactateDrive: fighter.lactateDrive,
+    lactateDriveCooldown: fighter.lactateDriveCooldown,
+    aerobicOutputTicks: fighter.aerobicOutputTicks,
+    aerobicGlycolysisCooldown: fighter.aerobicGlycolysisCooldown,
+    aerobicLightReady: fighter.aerobicLightReady,
   };
   return Object.freeze(copied);
 }
 
 function validateFighter(fighter: Fighter): void {
   validateAllowedKeys(fighter, FIGHTER_FIELDS, "fighter");
+  if (fighter.role !== "warburg" && fighter.role !== "opponent") {
+    throw new Error(`Unknown fighter role: ${fighter.role}`);
+  }
   validateNumber("Fighter x", fighter.x, -9, 9);
   validateNumber("Fighter z", fighter.z, -6, 6);
   validateNumber("Fighter hp", fighter.hp, 0, 100);
@@ -150,6 +165,20 @@ function validateFighter(fighter: Fighter): void {
   validateNumber("Fighter ticks", fighter.ticks, minimumTicks, maximumTicks, true);
   validateBoolean("Fighter hitDone", fighter.hitDone);
   validateBoolean("Fighter attackHeld", fighter.attackHeld);
+  validateBoolean("Fighter lactateDrive", fighter.lactateDrive);
+  validateNumber("Fighter lactateDriveCooldown", fighter.lactateDriveCooldown, 0, 44, true);
+  validateNumber("Fighter aerobicOutputTicks", fighter.aerobicOutputTicks, 0, 72, true);
+  validateNumber(
+    "Fighter aerobicGlycolysisCooldown",
+    fighter.aerobicGlycolysisCooldown,
+    0,
+    150,
+    true,
+  );
+  validateBoolean("Fighter aerobicLightReady", fighter.aerobicLightReady);
+  if (fighter.lactateDrive && fighter.state !== "light") {
+    throw new Error("Fighter Lactate Drive can only be active during a light attack");
+  }
 }
 
 function validateMatch(match: Pick<Match, "phase" | "round" | "winner" | "phaseTicks">): void {
