@@ -16,7 +16,7 @@ The build emits `dist/` for a static host. Run `./check_codebase.sh` for reposit
 
 ## Implementation
 
-[Combat state](src/match.ts) advances at 60 ticks per second. [The browser entry](src/main.ts) reads controls, drives a simple AI, and renders Red and Blue from presentation geometry. The active visual milestone is evaluating an existing open-license, anatomically proportioned adult-human asset through a local Babylon load and idle/walk/punch experiment before selecting a runtime source. Skeletal clips will follow combat state; gameplay hit and movement geometry remains in `Match`. Input is limited to known controls and bounded movement values (ASVS 2.1.1 and 2.2.1). Match phases are explicit (ASVS 2.3.1). The local dependency audit reports no vulnerabilities at the time of this implementation.
+[Combat state](src/match.ts) advances at 60 ticks per second. [The browser entry](src/main.ts) reads controls, drives a simple AI, and renders Red and Blue from presentation geometry. The visual integration uses the vendored CC0 Mesh2Motion `male_5` adult-human model and its direct same-rig animation clips; [the asset record](assets/README.md) pins its exact source revision and digests. Skeletal clips follow combat state while gameplay hit and movement geometry remains in `Match`. Input is limited to known controls and bounded movement values (ASVS 2.1.1 and 2.2.1). Match phases are explicit (ASVS 2.3.1). The local dependency audit reports no vulnerabilities at the time of this implementation.
 
 See [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md) for the prototype contract.
 

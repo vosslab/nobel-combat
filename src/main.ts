@@ -225,7 +225,7 @@ engine.runRenderLoop(() => {
   drawFighter(blue, models[1]);
   const mid = new Vector3((red.x + blue.x) / 2, 1, (red.z + blue.z) / 2);
   const span = Math.hypot(red.x - blue.x, red.z - blue.z);
-  const radius = (4 + span * 0.55) * cameraZoom;
+  const radius = (4 + span * 0.68) * cameraZoom;
   const desired = mid.add(
     new Vector3(
       Math.sin(cameraYaw) * Math.cos(cameraPitch) * radius,

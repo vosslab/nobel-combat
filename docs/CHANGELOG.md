@@ -12,11 +12,15 @@
   selecting a runtime humanoid source.
 - Added orbit, tilt, and zoom controls with camera-relative player movement.
 - Added a bounded deterministic combat harness, rig boundary checks, AI checks, and browser scenario gates.
+- Selected the CC0 Mesh2Motion `male_5` adult-human model at source commit
+  `3ce7f9d97d25e608b4779ce797da343775ded62b`, with direct same-rig base and addon animation GLBs,
+  as the generic fighter asset path. Provenance and SHA-256 digests are recorded in `assets/README.md`.
 
 ### Fixes and Maintenance
 
 - Kept get-up active for 18 simulation ticks so recovery is visible and the fighter cannot act during it.
-- Tightened adaptive camera framing to make the fighters larger on screen without changing gameplay size.
+- Tightened adaptive camera framing to make the fighters larger on screen and retained the
+  separation-dependent radius needed for maximum practical separation.
 - Repaired a dangling mesh reference in the trimmed animation GLB and limited animation target lookup to skeleton nodes, resolving two browser asset-load errors.
 - Ignored generated browser evidence and Python bytecode alongside the production build directory.
 - Extended the lint type-check input list with `src/**/*.ts` while retaining the original tests and tools targets.
@@ -38,5 +42,8 @@
 - Rejected the Quaternius candidate for the runtime visual direction because its blocky low-poly
   silhouette does not meet the requested anatomically proportioned adult-human target. Its
   provenance remains comparison evidence until replacement cleanup.
+- Rejected the Vitruvian plus external-animation path after direct browser evidence showed that its
+  retargeted clips distorted the adult body. The Mesh2Motion source avoids retargeting by supplying
+  the model and selected clips on the same rig.
 - Deferred Warburg and all other Nobel-character work until the selected generic human replacement
   passes its automated visual and gameplay checks.

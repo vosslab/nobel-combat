@@ -20,6 +20,9 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
   is acceptable; blocky, chibi, voxel, Roblox-like, or exaggerated cartoon proportions are not.
 - Evaluate MakeHuman, MB-Lab, and credible already-rigged open assets before selecting the source.
   Treat Mixamo-compatible skeletons and animations as a practical interoperability preference.
+- Use the selected Mesh2Motion `male_5` adult-human asset and its direct same-rig clips for this
+  generic Red-versus-Blue visual milestone. Keep the adult-human silhouette; do not return to the
+  chunky Quaternius look or character-construction work.
 - Keep visible meshes separate from gameplay hit geometry. Do not create a Nobel character,
   retargeting framework, roster, or customization system for this visual milestone.
 - Capture deterministic state screenshots as artifacts and validate asset load, skeletons, animation

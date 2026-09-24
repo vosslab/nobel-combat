@@ -32,21 +32,33 @@ authoritative code or contract document, rather than a person.
 
 **Owner.** `src/match.ts` and `src/main.ts`.
 
-### Realistic humanoid asset-selection boundary
+### Generic adult-human presentation asset
 
-**Decision.** Do not select Quaternius as the game character source. Use a bounded comparison of
-MakeHuman, MB-Lab, and an already-rigged open asset to select an anatomically proportioned adult
-human that loads locally in Babylon.js and demonstrates idle, walk, and punch before dual-fighter
-integration.
+**Decision.** Use the CC0 Mesh2Motion `male_5` GLB with Mesh2Motion's direct same-rig base and
+addon animation libraries for the generic Red and Blue fighters. The vendored source is commit
+`3ce7f9d97d25e608b4779ce797da343775ded62b`; exact paths, license link, and SHA-256 digests are in
+[`assets/README.md`](../assets/README.md).
 
-**Why.** The Quaternius candidate's blocky low-poly silhouette conflicts with the requested visual
-target. Asset selection is unresolved; committing the runtime to a technically convenient source
-would lock the game into the wrong presentation direction.
+**Why.** The model has an adult human silhouette, a local GLB loading path, and compatible clips on
+the same skeleton. The comparison rejected Quaternius for its chunky low-poly silhouette and
+rejected the Vitruvian body plus external-clip experiment because it required unreliable retargeting.
 
-**Consequence.** Existing Quaternius files are comparison evidence only and must not be described as
-the selected runtime asset. The selected future source records its exact license, source URL,
-vendored digest, local loading result, and animation path. `Match` remains independent of all mesh,
-bone, and animation data.
+**Consequence.** `Match` remains independent of meshes, bones, and clips. Rendering can only observe
+fighter state. Red and Blue must each receive independent skeleton, material, and animation-group
+instances. A later visual source change repeats the local-load and state-animation browser checks.
 
-**Owner.** `docs/active_plans/active/first_nobel_fighter.md`; final implementation ownership is
-assigned only after the H1-H4 experiment closes.
+**Owner.** `src/rigged_fighter.ts`, `assets/README.md`, and
+`docs/active_plans/active/first_nobel_fighter.md`.
+
+### Camera framing protects readable fighters
+
+**Decision.** Frame the adaptive camera more tightly while preserving a separation-dependent radius
+for the farthest valid fighter positions.
+
+**Why.** Fighters need a larger, more readable screen presence, including during attacks and hit
+states. A fixed tight radius would crop them at maximum practical separation.
+
+**Consequence.** Camera tests cover crossing, circling, edge movement, and maximum separation. View
+controls stay available and player movement remains camera-relative.
+
+**Owner.** `src/main.ts` and browser traversal fixtures.

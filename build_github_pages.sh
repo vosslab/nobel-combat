@@ -40,8 +40,9 @@ fi
 for required in \
 	src/index.html \
 	src/style.css \
-	assets/models/quaternius_superhero_male_fullbody.glb \
-	assets/animations/quaternius_combat.glb; do
+	assets/models/mesh2motion_male_5.glb \
+	assets/animations/mesh2motion_human_base.glb \
+	assets/animations/mesh2motion_human_addon.glb; do
 	if [ ! -f "$required" ]; then
 		echo "ERROR: required source file missing: $required" >&2
 		case "$required" in
@@ -78,13 +79,15 @@ npx esbuild "$ENTRY" \
 cp src/index.html dist/index.html
 cp src/style.css dist/style.css
 mkdir -p dist/assets/models dist/assets/animations
-cp assets/models/quaternius_superhero_male_fullbody.glb dist/assets/models/
-cp assets/animations/quaternius_combat.glb dist/assets/animations/
+cp assets/models/mesh2motion_male_5.glb dist/assets/models/
+cp assets/animations/mesh2motion_human_base.glb dist/assets/animations/
+cp assets/animations/mesh2motion_human_addon.glb dist/assets/animations/
 touch dist/.nojekyll
 
 test -f dist/index.html
 test -f dist/main.js
-test -s dist/assets/models/quaternius_superhero_male_fullbody.glb
-test -s dist/assets/animations/quaternius_combat.glb
+test -s dist/assets/models/mesh2motion_male_5.glb
+test -s dist/assets/animations/mesh2motion_human_base.glb
+test -s dist/assets/animations/mesh2motion_human_addon.glb
 
 echo "Built dist/ (GitHub Pages-ready)."

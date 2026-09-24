@@ -15,23 +15,24 @@ import "@babylonjs/loaders/glTF";
 
 import type { State } from "./match";
 
-const MODEL_URL = "assets/models/quaternius_superhero_male_fullbody.glb";
-const ANIMATION_URL = "assets/animations/quaternius_combat.glb";
+const MODEL_URL = "assets/models/mesh2motion_male_5.glb";
+const BASE_ANIMATION_URL = "assets/animations/mesh2motion_human_base.glb";
+const ADDON_ANIMATION_URL = "assets/animations/mesh2motion_human_addon.glb";
 const CLIP_NAMES = ["idle", "move", "light", "heavy", "block", "hit", "down", "getup"] as const;
 type ClipName = (typeof CLIP_NAMES)[number];
 type ClipMap = Record<ClipName, AnimationGroup>;
 
-// The library lacks a dedicated guard and get-up. The guard uses the closest
-// held pose; get-up reverses the knocked-down clip below. Match owns timing.
+// These native clips cover every combat state. Match owns their timing; this
+// table only controls visible playback speed within those fixed state windows.
 const SOURCE_CLIPS: Record<ClipName, string> = {
-  idle: "Idle_Loop",
-  move: "Walk_Loop",
-  light: "Punch_Jab",
+  idle: "Fighting Idle",
+  move: "Walk",
+  light: "Fighting Left Jab",
   heavy: "Punch_Cross",
-  block: "Sword_Idle",
-  hit: "Hit_Chest",
-  down: "Death01",
-  getup: "Death01",
+  block: "Defend",
+  hit: "Hit_Knockback",
+  down: "Death_D",
+  getup: "LayToIdle",
 };
 const LOOPING_STATES = new Set<State>(["idle", "move", "block"]);
 const CLIP_SPEEDS: Record<State, number> = {
@@ -41,7 +42,7 @@ const CLIP_SPEEDS: Record<State, number> = {
   heavy: 1,
   block: 1,
   hit: 2,
-  down: 18 / 35,
+  down: 2.5,
   getup: 2,
 };
 
@@ -84,7 +85,7 @@ function skeletonNodeMap(skeletons: Skeleton[]): Map<string, Node> {
     for (const bone of skeleton.bones) {
       const node = bone.getTransformNode();
       if (!node) continue;
-      // Quaternius exports use matching bone and transform-node names. Keep
+      // Mesh2Motion exports use matching bone and transform-node names. Keep
       // both identifiers because Babylon preserves either depending on how a
       // glTF asset was instantiated.
       add(bone.name, node);
@@ -94,13 +95,13 @@ function skeletonNodeMap(skeletons: Skeleton[]): Map<string, Node> {
   const byName = new Map<string, Node>();
   for (const [name, matching] of candidates) {
     if (matching.size !== 1)
-      throw new Error(`Quaternius model has ambiguous skeletal node '${name}'.`);
+      throw new Error(`Mesh2Motion model has ambiguous skeletal node '${name}'.`);
     const node = matching.values().next().value;
-    if (!node) throw new Error(`Quaternius model has no skeletal node '${name}'.`);
+    if (!node) throw new Error(`Mesh2Motion model has no skeletal node '${name}'.`);
     byName.set(name, node);
   }
   if (byName.size === 0)
-    throw new Error("Quaternius model has no linked skeletal transform nodes.");
+    throw new Error("Mesh2Motion model has no linked skeletal transform nodes.");
   return byName;
 }
 
@@ -113,7 +114,7 @@ function cloneClip(
     const target = targeted.target as Node;
     if (!targetNodes.has(target.name))
       throw new Error(
-        `Quaternius animation '${source.name}' cannot target '${target.name}' on ${label}.`,
+        `Mesh2Motion animation '${source.name}' cannot target '${target.name}' on ${label}.`,
       );
   }
   return source.clone(
@@ -135,7 +136,7 @@ function clipsForInstance(
     const sourceName = SOURCE_CLIPS[state];
     const source = sourceGroups.get(sourceName);
     if (!source)
-      throw new Error(`Quaternius animation library is missing '${sourceName}' for ${state}.`);
+      throw new Error(`Mesh2Motion animation library is missing '${sourceName}' for ${state}.`);
     clips[state] = cloneClip(source, targets, label);
   }
   return clips as ClipMap;
@@ -161,7 +162,7 @@ function assertIndependentInstances(redRoot: TransformNode, blueRoot: TransformN
   const blueMaterials = materialsFor(blueRoot);
   for (const material of materialsFor(redRoot)) {
     if (blueMaterials.has(material))
-      throw new Error("Quaternius fighter instances unexpectedly share a material.");
+      throw new Error("Mesh2Motion fighter instances unexpectedly share a material.");
   }
 }
 
@@ -173,11 +174,11 @@ function assertIndependentAnimationResources(
 ): void {
   for (const skeleton of redEntries.skeletons) {
     if (blueEntries.skeletons.includes(skeleton))
-      throw new Error("Quaternius fighter instances unexpectedly share a skeleton.");
+      throw new Error("Mesh2Motion fighter instances unexpectedly share a skeleton.");
   }
   for (const state of CLIP_NAMES) {
     if (redClips[state] === blueClips[state])
-      throw new Error("Quaternius fighter instances unexpectedly share an animation group.");
+      throw new Error("Mesh2Motion fighter instances unexpectedly share an animation group.");
   }
 }
 
@@ -223,7 +224,7 @@ function parentRootNodes(root: TransformNode, nodes: Node[]): void {
 
 function readableLoadError(error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
-  return `Could not load the Quaternius humanoid assets: ${detail}`;
+  return `Could not load the Mesh2Motion humanoid assets: ${detail}`;
 }
 
 function loadFailure(error: unknown): Error {
@@ -232,20 +233,19 @@ function loadFailure(error: unknown): Error {
   return failure;
 }
 
-function createSourceRelease(model: AssetContainer, animations: AssetContainer): () => void {
+function createSourceRelease(...assets: AssetContainer[]): () => void {
   let remainingFighters = 2;
   let disposed = false;
   return (): void => {
     remainingFighters--;
     if (remainingFighters !== 0 || disposed) return;
     disposed = true;
-    model.dispose();
-    animations.dispose();
+    for (const asset of assets) asset.dispose();
   };
 }
 
 /**
- * Loads CC0 Quaternius assets and creates independent red and blue instances.
+ * Loads CC0 Mesh2Motion assets and creates independent red and blue instances.
  * Match remains the sole authority for movement, combat, and timing.
  */
 export async function loadRiggedFighters(
@@ -253,11 +253,15 @@ export async function loadRiggedFighters(
   onError: RiggedFighterLoadError,
 ): Promise<[RiggedFighterModel, RiggedFighterModel]> {
   try {
-    const [modelAsset, animationAsset] = await Promise.all([
+    const [modelAsset, baseAnimationAsset, addonAnimationAsset] = await Promise.all([
       LoadAssetContainerAsync(MODEL_URL, scene),
-      LoadAssetContainerAsync(ANIMATION_URL, scene),
+      LoadAssetContainerAsync(BASE_ANIMATION_URL, scene),
+      LoadAssetContainerAsync(ADDON_ANIMATION_URL, scene),
     ]);
-    const sourceGroups = sourceGroupByName(animationAsset.animationGroups);
+    const sourceGroups = sourceGroupByName([
+      ...baseAnimationAsset.animationGroups,
+      ...addonAnimationAsset.animationGroups,
+    ]);
     const redEntries = modelAsset.instantiateModelsToScene(
       (sourceName) => `Red ${sourceName}`,
       true,
@@ -274,7 +278,7 @@ export async function loadRiggedFighters(
     const blueClips = clipsForInstance(blueEntries.skeletons, sourceGroups, "Blue");
     assertIndependentInstances(redRoot, blueRoot);
     assertIndependentAnimationResources(redEntries, blueEntries, redClips, blueClips);
-    const releaseSource = createSourceRelease(modelAsset, animationAsset);
+    const releaseSource = createSourceRelease(modelAsset, baseAnimationAsset, addonAnimationAsset);
     const red = createFighter(redRoot, new Color3(0.88, 0.08, 0.1), redClips, () => {
       redEntries.dispose();
       releaseSource();
