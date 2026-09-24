@@ -132,8 +132,9 @@ async function run(device, desired) {
     await page.waitForTimeout(120);
     await page.evaluate(() => (window.__testPad.buttons[9].pressed = false));
   } else {
-    await page.keyboard.press("r");
+    await page.keyboard.down("r");
     await page.waitForTimeout(120);
+    await page.keyboard.up("r");
   }
   const restarted = await snapshot(page);
   const result = {

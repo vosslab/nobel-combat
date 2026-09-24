@@ -177,8 +177,8 @@ function hud(): void {
     match.phase === "fight"
       ? "ROUND " + match.round
       : match.phase === "roundOver"
-        ? (match.winner === 0 ? "RED" : "BLUE") + " KO!"
-        : (match.winner === 0 ? "RED" : "BLUE") + " WINS THE MATCH";
+        ? (match.winner === 0 ? "WARBURG" : "AI") + " KO!"
+        : (match.winner === 0 ? "WARBURG" : "AI") + " WINS THE MATCH";
   if (status!.textContent !== message) status!.textContent = message;
 }
 let accumulator = 0;
@@ -223,9 +223,13 @@ engine.runRenderLoop(() => {
   const [red, blue] = match.fighters;
   drawFighter(red, models[0]);
   drawFighter(blue, models[1]);
-  const mid = new Vector3((red.x + blue.x) / 2, 1, (red.z + blue.z) / 2);
+  const mid = new Vector3((red.x + blue.x) / 2, 0.75, (red.z + blue.z) / 2);
   const span = Math.hypot(red.x - blue.x, red.z - blue.z);
-  const radius = (4 + span * 0.68) * cameraZoom;
+  const radius =
+    Math.max(
+      6.5,
+      4.5 + span * 0.55 + Math.max(0, span - 8) * 0.45 + Math.max(0, cameraPitch - 0.5) * 10,
+    ) * cameraZoom;
   const desired = mid.add(
     new Vector3(
       Math.sin(cameraYaw) * Math.cos(cameraPitch) * radius,
@@ -233,7 +237,9 @@ engine.runRenderLoop(() => {
       -Math.cos(cameraYaw) * Math.cos(cameraPitch) * radius,
     ),
   );
-  camera.position = Vector3.Lerp(camera.position, desired, 0.08);
+  // The debug harness can advance hundreds of ticks between rendered frames.
+  // Snap its camera to the resulting state; live play retains smooth tracking.
+  camera.position = debug ? desired : Vector3.Lerp(camera.position, desired, 0.08);
   camera.setTarget(mid);
   hud();
   scene.render();

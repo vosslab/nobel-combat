@@ -19,6 +19,11 @@ about cancer treatment.
   cells. The proposed fighter should therefore reference measured respiration and inhibition, not
   reduce Warburg's work to a broad or magical "energy" theme. [Warburg Nobel lecture
   (1931)](https://www.nobelprize.org/uploads/2018/06/warburg-lecture.pdf)
+- In his 1956 paper "On the Origin of Cancer Cells," Warburg reported respiration and lactic-acid
+  fermentation measurements for cancer cells, including measurements at oxygen saturation. That
+  supports a symbolic aerobic-glycolysis move, while his broader causal account of cancer remains a
+  historical hypothesis rather than the game's medical claim. [Warburg, *Science* 123 (1956),
+  309-314](https://doi.org/10.1126/science.123.3191.309)
 - His 1914 paper, *Uber die Rolle des Eisens in der Atmung des Seeigeleis*, documents an earlier
   investigation of iron's role in sea-urchin-egg respiration. [Heidelberg Academy digitization of
   Warburg (1914)](https://doi.org/10.11588/diglit.34096#0010)

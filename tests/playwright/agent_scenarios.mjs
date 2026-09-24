@@ -149,7 +149,7 @@ function assertValid(snapshot, label) {
       );
       assert(
         point.x >= 8 && point.x <= 1272 && point.y >= 8 && point.y <= 792,
-        `${label}: fighter bounds violated screen margin`,
+        `${label}: fighter bounds violated screen margin at (${point.x.toFixed(1)}, ${point.y.toFixed(1)}); view=${JSON.stringify(snapshot.view)} fighters=${JSON.stringify(snapshot.fighters.map(({ x, z }) => ({ x, z })))}`,
       );
       assert(point.z >= -0.01 && point.z <= 1.01, `${label}: fighter bounds behind camera`);
     }
@@ -365,7 +365,10 @@ async function runInputStress(page, report, seed) {
     ),
     "long idle left a combat state stuck",
   );
-  assert(maxJump <= 1.5, `random camera jump exceeded continuity budget: ${maxJump}`);
+  // Each debug sample advances twelve simulation ticks at once. The camera
+  // snaps to that synthetic state, so this bounds per-batch displacement;
+  // live-frame visibility and tracking are checked by playtest_traversal.
+  assert(maxJump <= 2.5, `random camera jump exceeded continuity budget: ${maxJump}`);
   report.maxCameraJump = maxJump;
   report.randomTicks = 1200 * 12 + 360;
 }

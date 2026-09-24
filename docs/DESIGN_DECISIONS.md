@@ -62,3 +62,21 @@ states. A fixed tight radius would crop them at maximum practical separation.
 controls stay available and player movement remains camera-relative.
 
 **Owner.** `src/main.ts` and browser traversal fixtures.
+
+### Warburg starts the Nobel roster
+
+**Decision.** Make Otto Warburg the first research-based fighter and signature character after the
+generic fighter foundation. Use a locally vendored, same-rig adult scientist model. Make Warburg
+stronger than the standard AI opponent through explicit character-specific combat rules.
+
+**Why.** This follows the game's scientific theme and the requested roster direction. Warburg's
+respiratory-enzyme research, tumor-metabolism work, and the later-named Warburg effect offer distinct
+sources for moves without inventing a general ability framework.
+
+**Consequence.** Preserve deterministic 60 Hz simulation and keep character rules explicit until a
+second real fighter demonstrates a need for shared roster data. Attribute his 1931 Nobel Prize to
+the respiratory enzyme; describe tumor-metabolism and aerobic-glycolysis powers as game adaptations,
+not as the award citation or a cancer-treatment claim.
+
+**Owner.** `docs/active_plans/active/first_nobel_fighter.md`, `docs/WARBURG_SOURCE_DOSSIER.md`, and
+the existing Match/rig boundaries.

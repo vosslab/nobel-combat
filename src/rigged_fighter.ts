@@ -15,7 +15,8 @@ import "@babylonjs/loaders/glTF";
 
 import type { State } from "./match";
 
-const MODEL_URL = "assets/models/mesh2motion_male_5.glb";
+const WARBURG_MODEL_URL = "assets/models/mesh2motion_doctor_m.glb";
+const AI_MODEL_URL = "assets/models/mesh2motion_male_5.glb";
 const BASE_ANIMATION_URL = "assets/animations/mesh2motion_human_base.glb";
 const ADDON_ANIMATION_URL = "assets/animations/mesh2motion_human_addon.glb";
 const CLIP_NAMES = ["idle", "move", "light", "heavy", "block", "hit", "down", "getup"] as const;
@@ -31,7 +32,7 @@ const SOURCE_CLIPS: Record<ClipName, string> = {
   heavy: "Punch_Cross",
   block: "Defend",
   hit: "Hit_Knockback",
-  down: "Death_D",
+  down: "Death_C",
   getup: "LayToIdle",
 };
 const LOOPING_STATES = new Set<State>(["idle", "move", "block"]);
@@ -42,7 +43,7 @@ const CLIP_SPEEDS: Record<State, number> = {
   heavy: 1,
   block: 1,
   hit: 2,
-  down: 2.5,
+  down: 5,
   getup: 2,
 };
 
@@ -184,14 +185,14 @@ function assertIndependentAnimationResources(
 
 function createFighter(
   root: TransformNode,
-  color: Color3,
+  color: Color3 | undefined,
   clips: ClipMap,
   disposeEntries: () => void,
 ): RiggedFighterModel {
   let activeState: State | undefined;
   let disposed = false;
   const groups = Object.values(clips);
-  setColor(root, color);
+  if (color) setColor(root, color);
 
   function update(state: State): void {
     if (activeState === state) return;
@@ -245,7 +246,7 @@ function createSourceRelease(...assets: AssetContainer[]): () => void {
 }
 
 /**
- * Loads CC0 Mesh2Motion assets and creates independent red and blue instances.
+ * Loads the CC0 Mesh2Motion scientist and AI assets with independent rigs.
  * Match remains the sole authority for movement, combat, and timing.
  */
 export async function loadRiggedFighters(
@@ -253,33 +254,40 @@ export async function loadRiggedFighters(
   onError: RiggedFighterLoadError,
 ): Promise<[RiggedFighterModel, RiggedFighterModel]> {
   try {
-    const [modelAsset, baseAnimationAsset, addonAnimationAsset] = await Promise.all([
-      LoadAssetContainerAsync(MODEL_URL, scene),
-      LoadAssetContainerAsync(BASE_ANIMATION_URL, scene),
-      LoadAssetContainerAsync(ADDON_ANIMATION_URL, scene),
-    ]);
+    const [warburgModelAsset, aiModelAsset, baseAnimationAsset, addonAnimationAsset] =
+      await Promise.all([
+        LoadAssetContainerAsync(WARBURG_MODEL_URL, scene),
+        LoadAssetContainerAsync(AI_MODEL_URL, scene),
+        LoadAssetContainerAsync(BASE_ANIMATION_URL, scene),
+        LoadAssetContainerAsync(ADDON_ANIMATION_URL, scene),
+      ]);
     const sourceGroups = sourceGroupByName([
       ...baseAnimationAsset.animationGroups,
       ...addonAnimationAsset.animationGroups,
     ]);
-    const redEntries = modelAsset.instantiateModelsToScene(
-      (sourceName) => `Red ${sourceName}`,
+    const redEntries = warburgModelAsset.instantiateModelsToScene(
+      (sourceName) => `Warburg ${sourceName}`,
       true,
     );
-    const blueEntries = modelAsset.instantiateModelsToScene(
-      (sourceName) => `Blue ${sourceName}`,
+    const blueEntries = aiModelAsset.instantiateModelsToScene(
+      (sourceName) => `AI ${sourceName}`,
       true,
     );
-    const redRoot = new TransformNode("Red rig root", scene);
-    const blueRoot = new TransformNode("Blue rig root", scene);
+    const redRoot = new TransformNode("Warburg rig root", scene);
+    const blueRoot = new TransformNode("AI rig root", scene);
     parentRootNodes(redRoot, redEntries.rootNodes);
     parentRootNodes(blueRoot, blueEntries.rootNodes);
-    const redClips = clipsForInstance(redEntries.skeletons, sourceGroups, "Red");
-    const blueClips = clipsForInstance(blueEntries.skeletons, sourceGroups, "Blue");
+    const redClips = clipsForInstance(redEntries.skeletons, sourceGroups, "Warburg");
+    const blueClips = clipsForInstance(blueEntries.skeletons, sourceGroups, "AI");
     assertIndependentInstances(redRoot, blueRoot);
     assertIndependentAnimationResources(redEntries, blueEntries, redClips, blueClips);
-    const releaseSource = createSourceRelease(modelAsset, baseAnimationAsset, addonAnimationAsset);
-    const red = createFighter(redRoot, new Color3(0.88, 0.08, 0.1), redClips, () => {
+    const releaseSource = createSourceRelease(
+      warburgModelAsset,
+      aiModelAsset,
+      baseAnimationAsset,
+      addonAnimationAsset,
+    );
+    const red = createFighter(redRoot, undefined, redClips, () => {
       redEntries.dispose();
       releaseSource();
     });
