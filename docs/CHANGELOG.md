@@ -109,6 +109,7 @@
   of viewport height at the default landscape start while retaining full-separation framing.
 - Kept the Franklin milestone plan's F3 reducer pure and assigned concrete browser storage reads,
   writes, persistence, and failure behavior to F6A-F6D after independent plan review.
+- Synchronized shared style guides, tests, and repository support files from the starter template.
 
 ### Developer Tests and Notes
 
