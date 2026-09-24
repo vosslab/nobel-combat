@@ -4,22 +4,38 @@
 
 ### Additions and New Features
 
+- Isolated AI behavior behind a seeded random source; local browser playtests use a fixed seed so
+  live winner and progression scenarios remain repeatable.
+- Added a brief gold impact spark for unblocked damage and a blue spark for blocked damage; both
+  follow the struck fighter and fade on render time.
+- Added soft directional shadows from loaded fighter meshes so their foot contact reads against the
+  arena floor.
 - Linked the live game near the README opening with descriptive link text.
 - Added the Franklin player role against Warburg AI while retaining `warburg | curie` as the
   Nobel-fighter vocabulary used by unlock progression. Franklin currently uses the existing
-  `female_31` rig fallback and the HUD identifies her as Rosalind Franklin; chooser unlock and
+  `female_9` rig and the HUD identifies her as Rosalind Franklin; chooser unlock and
   progression remain separate milestones.
 - Added the pure, versioned Franklin unlock reducer for wins as both Nobel player roles; browser
   storage remains outside the reducer.
-- Mapped Franklin to the existing female_31 rig with role-resolved names and combat-state clips,
+- Mapped Franklin to the existing female_9 rig with role-resolved names and combat-state clips,
   while retaining the asset's authored appearance and independent resources from Warburg.
-- Added a serial Playwright capture test that writes Franklin's eight combat-state screenshots to
-  the ignored `test-results/rig-states-franklin-f4/` evidence directory.
+- Added serial Playwright captures for Curie's and Franklin's eight combat-state screenshots in
+  ignored evidence directories.
 - Added a browser regression asserting that Otto Heinrich Warburg's full name remains in both
   player and AI HUD and accessibility labels.
-- Refit the camera to each screen-space axis and nearest-fighter depth so both rigged fighters are
-  larger during ordinary play; live browser checks require at least 20% viewport-height presence at
-  the default landscape start and preserve traversal visibility and continuity.
+- Refit the camera to each screen-space axis and nearest-fighter depth, and frame the pair on their
+  first visible render. Both rigged fighters are larger during ordinary play; live browser checks
+  require at least 27% viewport-height presence at the default landscape start and preserve
+  traversal visibility and continuity.
+- Replaced Curie's contemporary outfit with a local CC0 OpenGameArt rigged long-dress model and
+  retargeted the existing eight combat clips through one explicit Babylon.js bone map.
+- Added a small belt pressure gauge and forearm manometer attached to Warburg's existing rig; the
+  needle and oxygen-flow pulse follow Oxygen Transfer ticks without changing combat state.
+- Aligned keyboard and synthetic-gamepad live-match scenarios to Curie versus Warburg AI, paced
+  heavy attacks from fighter recovery states, and checked both outcomes per input group rather than
+  requiring a particular winner in each repeated match.
+- Made the Franklin chooser's final gamepad assertion inspect the mapped light action directly so an
+  AI hit during browser navigation cannot mask successful input mapping.
 
 ### Behavior or Interface Changes
 
@@ -42,10 +58,10 @@
   `nobel-combat.franklin-unlock.v1`, returns an explicit read-failure result, and writes only encoded
   records with an explicit success result; failed storage remains locked and playable without an
   optimistic chooser update or announcement.
-- Completed F6B's winner-edge progression boundary. Only live non-debug complete player victories
-  as Warburg or Curie can advance progress, and a changed durable write completes before application
-  state, chooser reveal, or F5B's post-commit announcement seam. AI, round, restart, repeated,
-  debug, and Franklin events cannot advance progression.
+- Completed F6B's winner-edge progression boundary. Only a completed player victory as Warburg or
+  Curie can advance progress, and a changed durable write completes before application state,
+  chooser reveal, or F5B's post-commit announcement seam. AI wins, round wins, restart, repeated
+  edges, direct forced-phase fixtures, and Franklin wins cannot advance progression.
 - Completed F6C's durable browser progression scenarios. Both real full Nobel-win orders remain
   locked after one win, unlock durably with one announcement after the second, and reload silently.
   The existing F6A startup fixture covers denied reads; a denied write preserves the partial record,
@@ -67,13 +83,62 @@
 
 ### Fixes and Maintenance
 
+- Clarified Curie's appearance guidance with direct wording about her face and facial hair.
+- Corrected the `npm run clean` alias to call the existing light-clean script, repaired literal
+  control-help separators, and updated browser-contract comments to point at the current chooser
+  logic.
+- Recorded the downloadable Curie source file's digest and identified the missing GLB export
+  settings; clarified that the runtime model set excludes compatibility fixtures.
+- Removed the unused `male_5` compatibility model from production build output while retaining it for
+  source-level rig compatibility checks.
+- Replaced rig clip-map type assertions with explicit required-clip checks and corrected the stale
+  TypeScript test quickstart clean-command reference.
+- Corrected the fighter-asset design record to name Warburg's runtime `doctor_m` rig and identify
+  `male_5` as a compatibility fixture.
+- Reduced the center-floor mark's contrast and width; its bright stripe previously bisected the
+  fighters and dominated the arena view.
+- Replaced Curie's contemporary clothing model with the CC0 OpenGameArt `Old Lady` asset; combat
+  state, gameplay geometry, and Franklin's `female_9` presentation remain unchanged.
+- Kept inactive character models hidden until their roles enter the match, preventing a ghost fighter and
+  idle animation work in the background; browser captures assert exactly two visible fighters.
+  Asset load errors now name the combined fighter asset set.
+- Made live camera tracking time-based and bounded per rendered frame so portrait and landscape
+  resizing reframes quickly without a discontinuous camera jump.
+- Brought the fighters' opening positions 2.4 units closer and lowered the close-range camera floor
+  from 6.5 to 5.5 units; the live browser invariant now requires both humans to occupy at least 27%
+  of viewport height at the default landscape start while retaining full-separation framing.
 - Kept the Franklin milestone plan's F3 reducer pure and assigned concrete browser storage reads,
   writes, persistence, and failure behavior to F6A-F6D after independent plan review.
 
 ### Developer Tests and Notes
 
+- After the arena shadow update, `./check_codebase.sh` passed 46/46 Node tests plus strict
+  TypeScript, lint, and formatting; `./build_github_pages.sh` passed; the focused browser suite
+  passed 4/4 for deterministic combat/camera/endurance, six keyboard/gamepad matches, traversal,
+  and all eight Curie/Franklin rig-state captures without browser errors.
+- The impact cue scenario verifies visible hit/block state, camera-forward fighter placement, and
+  hit-cue expiration through the rendered browser snapshot; its deterministic combat/camera/
+  endurance scenario passed without browser errors.
 - Added a built-page Playwright regression for help layout in fight and match-over states at
   320x568, 375x667, 768x1024, and 1280x800; text bounds, button separation, and browser errors pass.
+- Verified Franklin's `female_9` GLB's ordered 66-joint rig and native animation clips, and captured
+  its deterministic combat states without browser errors.
+- Verified Curie's 84-joint CC0 model, its asset-specific mapping coverage for all eight clips,
+  independent two-fighter visibility, and deterministic browser captures with no errors.
+- Made the live knockdown/recovery fixture track the intended fighter index so an opposing KO cannot
+  be mistaken for the target's successful down-to-get-up transition.
+- Replaced the live traversal test's short fixed-window light taps with a state-driven probe: it
+  restarts into a clean match, approaches using current fighter positions, and waits for the light
+  state and target damage. The focused keyboard/gamepad traversal scenario passed three repeats.
+- Final integrated validation after the traversal fix: `./check_codebase.sh` passed 49/49 Node tests,
+  strict TypeScript, lint, and formatting; `./run_playwright_tests.sh --build --workers=1` passed
+  33/33 serial browser tests; the build and `git diff --check` passed; both TypeScript configs are
+  unchanged; and `npm audit --audit-level=high` reported zero vulnerabilities.
+- Final validation after Curie's period-dress integration: `./check_codebase.sh` passed 46/46 Node
+  tests plus strict TypeScript, lint, and formatting; `./build_github_pages.sh` passed; the full
+  serial Playwright suite passed 33/33 with no browser errors. Curie and Franklin captures include
+  all eight combat states in ignored `test-results/` directories; TypeScript config files are
+  unchanged.
 - Franklin F2 focused match/debug tests passed 18/18, `./check_codebase.sh` passed 30/30 Node tests
   plus strict TypeScript, lint, and formatting, and `./build_github_pages.sh` passed. Independent
   code review accepted F2; `tsconfig.json` and `tsconfig.lint.json` remain unchanged.
@@ -112,7 +177,7 @@
 - The fresh F7C command `PW_PORT=4174 ./run_playwright_tests.sh --build
 tests/playwright/franklin_endurance.spec.ts --workers=1` passed 1/1 in 1.4 minutes; independent
   review accepted it. Live visibility checks cover fighter center, feet, and head anchors from
-  0–2.7 m, rather than animated limb extrema; pitch/zoom endpoints are not cross-producted with
+  0 to 2.7 m, rather than animated limb extrema; pitch/zoom endpoints are not cross-producted with
   maximum separation.
 - Final F8 evidence: `./check_codebase.sh` passed strict typecheck, lint typecheck, ESLint,
   Prettier, and 45/45 Node tests; `./build_github_pages.sh` passed with a 7.3 MB `dist/main.js`;

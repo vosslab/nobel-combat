@@ -27,9 +27,22 @@ export function installPlaytestProbe(
     z: number;
     yaw: number;
   }> | null,
+  models: () => ReadonlyArray<{
+    rootId: number;
+    fighterName: string;
+    enabled: boolean;
+  }> | null,
   cues: () => {
     oxygen: { enabled: boolean; x: number; y: number; z: number };
     output: { enabled: boolean; x: number; y: number; z: number };
+    impacts: ReadonlyArray<{
+      enabled: boolean;
+      kind: "hit" | "block" | null;
+      x: number;
+      y: number;
+      z: number;
+      alpha: number;
+    }>;
   },
   input: () => InputFrame,
 ): void {
@@ -53,6 +66,7 @@ export function installPlaytestProbe(
       target: { x: camera.getTarget().x, y: camera.getTarget().y, z: camera.getTarget().z },
       view: view(),
       rigs: rigs(),
+      models: models(),
       cues: cues(),
       input: input(),
       screen: match.fighters.map((fighter) => project(fighter.x, 1.2, fighter.z)),

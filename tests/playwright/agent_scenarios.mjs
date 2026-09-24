@@ -122,6 +122,17 @@ function assertCueAt(cue, fighter, label) {
   );
 }
 
+function assertImpactCueAt(cue, fighter, yaw, label) {
+  assert(cue?.enabled, `${label}: cue was not visible`);
+  const expectedX = fighter.x + Math.sin(yaw) * 0.48;
+  const expectedZ = fighter.z - Math.cos(yaw) * 0.48;
+  assert(
+    Math.abs(cue.x - expectedX) <= RIG_POSITION_TOLERANCE &&
+      Math.abs(cue.z - expectedZ) <= RIG_POSITION_TOLERANCE,
+    `${label}: cue at (${cue.x}, ${cue.z}) did not stay camera-forward of fighter at (${fighter.x}, ${fighter.z}); expected (${expectedX}, ${expectedZ}) from yaw ${yaw}`,
+  );
+}
+
 async function advance(page, ticks, red = NEUTRAL, blue = NEUTRAL) {
   await page.evaluate(({ ticks, red, blue }) => window.__fightDebug.advance(ticks, [red, blue]), {
     ticks,
@@ -327,8 +338,17 @@ async function runCombat(page, report) {
     state.fighters[BLUE].hp === 90 && state.fighters[BLUE].state === "hit",
     "light attack did not hit once",
   );
+  const hitCue = state.cues?.impacts?.[BLUE];
+  assertImpactCueAt(hitCue, state.fighters[BLUE], state.view.yaw, "ordinary light impact");
+  assert(hitCue.kind === "hit", "ordinary light impact did not use the hit cue");
+  assert(hitCue.alpha >= 0.5, "ordinary light impact cue faded before its visible capture");
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, "light-impact.png") });
+  await page.waitForFunction(() => !window.__fightSnapshot?.().cues?.impacts?.[1]?.enabled);
+  state = await snapshot(page);
+  assert(!state.cues.impacts[BLUE].enabled, "light impact cue did not expire");
   report.states.add("light");
   report.states.add("hit");
+  report.states.add("impact");
   state = await advance(page, 30);
   assert(state.fighters[BLUE].state === "idle", "hit stun did not recover");
   await forceFighter(page, RED, { x: -0.8, z: 0, state: "idle", ticks: 0, attackHeld: false });
@@ -341,6 +361,11 @@ async function runCombat(page, report) {
     state.fighters[RED].hp === 98 && state.fighters[RED].state === "block",
     "attack into block was incorrect",
   );
+  const blockCue = state.cues?.impacts?.[RED];
+  assertImpactCueAt(blockCue, state.fighters[RED], state.view.yaw, "blocked impact");
+  assert(blockCue.kind === "block", "blocked impact did not use the block cue");
+  assert(blockCue.alpha >= 0.5, "blocked impact cue faded before its visible capture");
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, "block-impact.png") });
   report.states.add("block");
   await forceFighter(page, RED, { x: -0.8, z: 0, state: "idle", ticks: 0, attackHeld: false });
   await forceFighter(page, BLUE, { x: 0.8, z: 0, hp: 100, state: "idle", ticks: 0 });
@@ -811,7 +836,7 @@ async function runInputStress(page, report, seed) {
   // strike can add a 0.65-unit knockback. The framing radius changes with
   // separation as well as midpoint movement, so 4.5 bounds that legal batch
   // displacement with a small margin. Live frame continuity retains its
-  // tighter bound in the production-browser F7C scenario.
+  // tighter bound in the production-browser endurance scenario.
   assert(
     maxJump <= 4.5,
     `random debug-batch camera jump exceeded 4.5-unit physical budget: ${maxJump}; ${maxJumpContext}`,

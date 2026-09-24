@@ -150,8 +150,8 @@ async function restartWithKeyboard(page: Page): Promise<void> {
 
 async function completePlayerWin(page: Page): Promise<Trace> {
   const trace: Trace = { ko: false, roundOver: false, roundTwo: false, pair: true };
+  const heldKeys = new Set<string>();
   const deadline = Date.now() + 90_000;
-  let retry = 0;
   while (Date.now() < deadline) {
     const current = await state(page);
     observe(trace, current);
@@ -159,21 +159,30 @@ async function completePlayerWin(page: Page): Promise<Trace> {
     const [player, opponent] = current.fighters;
     if (!player || !opponent) throw new Error("Match did not expose two fighters.");
     const distance = Math.hypot(player.x - opponent.x, player.z - opponent.z);
-    const block =
-      ["light", "heavy"].includes(opponent.state) &&
-      ["idle", "move", "block"].includes(player.state);
-    const heavy =
-      distance < 2.15 && ["idle", "move", "block"].includes(player.state) && retry-- <= 0;
-    if (heavy) retry = 7;
-    await page.keyboard.down(distance > 1.7 && opponent.x > player.x ? "KeyD" : "KeyA");
-    await page.keyboard.down(distance > 1.7 && opponent.z > player.z ? "KeyS" : "KeyW");
-    if (block) await page.keyboard.down("KeyL");
-    else await page.keyboard.up("KeyL");
-    if (heavy) await page.keyboard.down("KeyK");
-    else await page.keyboard.up("KeyK");
+    const canAct = ["idle", "move", "block"].includes(player.state);
+    const block = ["light", "heavy"].includes(opponent.state) && canAct;
+    const light = !block && distance <= 1.8 && canAct;
+    const desired = {
+      KeyA: distance > 1.8 && opponent.x < player.x,
+      KeyD: distance > 1.8 && opponent.x > player.x,
+      KeyW: distance > 1.8 && opponent.z > player.z,
+      KeyS: distance > 1.8 && opponent.z < player.z,
+      KeyJ: light,
+      KeyK: false,
+      KeyL: block,
+    };
+    for (const [key, pressed] of Object.entries(desired)) {
+      if (pressed && !heldKeys.has(key)) {
+        await page.keyboard.down(key);
+        heldKeys.add(key);
+      } else if (!pressed && heldKeys.has(key)) {
+        await page.keyboard.up(key);
+        heldKeys.delete(key);
+      }
+    }
     await page.waitForTimeout(70);
-    for (const key of ["KeyA", "KeyD", "KeyW", "KeyS", "KeyK", "KeyL"]) await page.keyboard.up(key);
   }
+  for (const key of heldKeys) await page.keyboard.up(key);
   const result = await state(page);
   observe(trace, result);
   expect(result).toMatchObject({ phase: "matchOver", winner: 0 });

@@ -33,23 +33,54 @@ authoritative code or contract document, rather than a person.
 
 **Owner.** `src/match.ts` and `src/main.ts`.
 
-### Generic adult-human presentation asset
+### AI randomness is isolated from rendering
 
-**Decision.** Use the CC0 Mesh2Motion `male_5` GLB with Mesh2Motion's direct same-rig base and
-addon animation libraries for the generic Red and Blue fighters. The vendored source is commit
-`3ce7f9d97d25e608b4779ce797da343775ded62b`; exact paths, license link, and SHA-256 digests are in
+**Decision.** Give the AI controller its own seeded 32-bit random source. A normal app session draws
+one seed; local browser playtests use the fixed seed `1`.
+
+**Why.** Reproducible AI actions make live match scenarios repeatable and prevent unrelated browser
+randomness from advancing the combat controller's sequence.
+
+**Consequence.** `createAi` continues to accept an injected random source, while Babylon rendering
+and asset loading cannot change subsequent AI decisions. Match state and combat rules remain
+independent of the random generator.
+
+**Owner.** `src/ai.ts`, `src/main.ts`, and `tests/test_ai.mjs`.
+
+### Warburg uses a scientist rig
+
+**Decision.** Present Otto Heinrich Warburg with the local CC0 Mesh2Motion `doctor_m` GLB and its
+direct same-rig base and addon animation clips. Keep Mesh2Motion `male_5` as a source-level
+compatibility test fixture; it is not loaded at runtime or copied into production. The exact
+sources and SHA-256 digests are recorded in
 [`assets/README.md`](../assets/README.md).
 
-**Why.** The model has an adult human silhouette, a local GLB loading path, and compatible clips on
-the same skeleton. The comparison rejected Quaternius for its chunky low-poly silhouette and
-rejected the Vitruvian body plus external-clip experiment because it required unreliable retargeting.
+**Why.** `doctor_m` gives Warburg a distinct adult scientist presentation while sharing the
+66-joint skeleton used by the vendored animation libraries. The earlier `male_5` experiment proved
+the asset pipeline before the character-specific models were selected.
 
-**Consequence.** `Match` remains independent of meshes, bones, and clips. Rendering can only observe
-fighter state. Red and Blue must each receive independent skeleton, material, and animation-group
-instances. A later visual source change repeats the local-load and state-animation browser checks.
+**Consequence.** `Match` remains independent of meshes, bones, and clips. Rendering maps this rig to
+the Warburg role and follows authoritative fighter state. A future model change repeats local-load,
+animation-state, and rendered-match checks.
 
 **Owner.** `src/rigged_fighter.ts`, `assets/README.md`, and
-`docs/archive/first_nobel_fighter.md`.
+[`docs/archive/first_nobel_fighter.md`](archive/first_nobel_fighter.md).
+
+### Warburg's apparatus follows the existing rig
+
+**Decision.** Attach a small belt gauge and forearm manometer to Warburg's existing pelvis and arm
+transforms. Drive the gauge needle and iron-red flow pulse from the authoritative heavy-attack
+state and fixed simulation ticks.
+
+**Why.** The source dossier connects Warburg's visual signature to historical manometric methods.
+The two small apparatus details make Oxygen Transfer readable while reusing the current model and
+skeletal hierarchy.
+
+**Consequence.** The accessories are presentation-only. They do not supply collision geometry,
+affect Fighter state, or add animation timing. Browser captures verify attachment presence, attack
+progress, needle response, and reset after the move.
+
+**Owner.** `src/rigged_fighter.ts` and `tests/playwright/capture_rig_states.mjs`.
 
 ### Camera framing protects readable fighters
 
@@ -59,17 +90,51 @@ camera space, fit each extent to its matching FOV axis, and include the nearer f
 **Why.** The original circumscribed-sphere fit charged its diagonal radius to the narrower FOV on
 both axes. This kept fighters visible but made them too small in ordinary landscape play. Axis-based
 perspective fitting makes the fighters larger while retaining headroom for the current GLB sizes,
-camera orbit, pitch, and practical separation.
+camera orbit, pitch, and practical separation. The first camera frame snaps to the loaded pair so
+fighters never appear undersized while the live tracking camera smoothly follows later movement.
+Time-based follow responds quickly to viewport changes, and a per-render displacement bound keeps
+reframing continuous. The opening pair starts 3.6 world units apart, and the close-range framing
+floor is 5.5 units; this keeps the human silhouettes prominent at the start while the pair-based fit
+continues to pull back at practical maximum separation.
 
 **Consequence.** Camera tests cover crossing, circling, edge movement, and maximum separation. The
 live fixture waits for rendered frames after resize and uses separate fresh knockdown windows for
 its aspect-ratio separation trials. At the default landscape start, both models must occupy at least
-20% of viewport height. View controls stay available and player movement remains camera-relative.
+27% of viewport height. View controls stay available and player movement remains camera-relative.
 Live projections verify center, feet, model tops, and conservative head anchors from 0 to 2.7 m; they
 do not prove every animated limb extremum, and pitch/zoom endpoints are not cross-producted with
 maximum separation.
 
 **Owner.** `src/main.ts` and browser traversal fixtures.
+
+### Fighters cast soft stage shadows
+
+**Decision.** Loaded rigged fighter meshes cast soft shadows onto the arena floor. Keep shadow
+generation in Babylon presentation; the `Match` positions and collision volumes remain authoritative.
+
+**Why.** The flat arena made foot placement difficult to read against the floor. Subtle contact
+shadows ground the existing human models without changing their geometry or combat state.
+
+**Consequence.** The renderer owns one bounded shadow map for all local fighter assets, while disabled
+role models remain hidden. Browser state captures check the rendered path for all three fighter rigs.
+
+**Owner.** `src/main.ts`, `src/rigged_fighter.ts`, and the existing rig-state capture tests.
+
+### Hit feedback follows damage
+
+**Decision.** Show a brief gold ring when a fighter takes unblocked damage and a blue ring when a
+held block absorbs a strike. Anchor each cue near the affected fighter and expire it using render
+elapsed time.
+
+**Why.** The attack and hit animations communicate motion, but confirmed contact also needs a quick
+visual signal that remains readable across camera angles and hit reactions.
+
+**Consequence.** Cue activation observes health loss after `Match` resolves the hit. It does not
+change damage, collision, animation timing, or fighter state. Local debug snapshots expose cue kind,
+position, alpha, and visibility so the browser scenario can verify the presentation contract.
+
+**Owner.** `src/main.ts`, `src/playtest_probe.ts`, and
+`tests/playwright/agent_scenarios.mjs`.
 
 ### Warburg starts the Nobel roster
 
@@ -95,22 +160,26 @@ plan and source dossier.
 **Owner.** `docs/archive/first_nobel_fighter.md`, `docs/WARBURG_SOURCE_DOSSIER.md`, and
 the existing Match/rig boundaries.
 
-### Curie uses a native rig
+### Curie uses a period-dress rig
 
-**Decision.** Present Marie Curie as the AI opponent with the vendored CC0 Mesh2Motion
-`female_31.glb` model and existing direct same-rig clips. Preserve her authored clothing and
-proportions instead of multiplying every material by a fighter color.
+**Decision.** Present Marie Curie as the AI opponent with the vendored CC0 OpenGameArt `Old Lady`
+model, which has a long high-necked dress, gray updo, feminine face, and 84-joint rig. Retarget the
+existing local combat clips with Babylon.js `AnimatorAvatar` and one explicit asset-specific bone
+map. Rosalind Franklin continues to use the CC0 Mesh2Motion `female_9.glb` model and native clips.
 
-**Why.** The pinned asset has a natural adult-human silhouette, 1,211 triangles, and the same ordered
-66-joint rig as Warburg and the curated local animation libraries. Browser captures show each current
-combat state without load or mapping errors.
+**Why.** The previous Curie model's contemporary clothing did not fit the historical character.
+OpenGameArt's CC0 `Old Lady` asset already provides a rigged period-style dress and an explicitly
+authored feminine face. Babylon supports animation-group retargeting across differently named rigs;
+the selected model's local animation map covers at least 50 joints in each combat clip. Automated
+captures exercise every current state without browser errors.
 
 **Consequence.** `Match` still identifies the blue fighter only as the existing `opponent` role and
 owns AI behavior, combat state, position, hit volumes, and timing. The visual layer identifies that
-opponent as Curie and must retain independent skeletons, materials, and animation groups.
+opponent as Curie and retains an independent skeleton and animation groups. The model stays local;
+the single explicit map does not generalize the animation system.
 
-**Owner.** `src/rigged_fighter.ts`, `src/index.html`, `assets/README.md`, and
-`docs/archive/next_nobel_fighter.md`.
+**Owner.** `src/rigged_fighter.ts`, `src/main.ts`, `src/playtest_probe.ts`,
+`build_github_pages.sh`, `assets/README.md`, and the rig-boundary browser tests.
 
 ### Curie uses a direct Separation Step rule
 
@@ -139,7 +208,7 @@ keeping `NobelFighterRole` limited to Warburg and Curie for unlock progression.
 Nobel fighters, and the two-slot match does not need opponent selection or roster infrastructure.
 
 **Consequence.** `Match.selectPlayer("franklin")` always creates Franklin in slot 0 and Warburg in
-slot 1; round reset and restart preserve that pair. The existing `female_31` rig supplies the
+slot 1; round reset and restart preserve that pair. The existing `female_9` rig supplies the
 visual representation, with its display name resolved from the fighter role.
 
 **Owner.** `src/match.ts` and
@@ -147,11 +216,12 @@ visual representation, with its display name resolved from the fighter role.
 
 ### Franklin unlock reduction stays separate from browser storage
 
-**Decision.** Keep the versioned Franklin win record reducer pure. The F6A adapter in
+**Decision.** Keep the versioned Franklin win record reducer pure. The storage adapter in
 `src/franklin_storage.ts` owns reads and writes for
-`nobel-combat.franklin-unlock.v1`; F6B in `src/franklin_progression.ts` consumes only a live,
-non-debug complete player Warburg or Curie match victory and exposes an unlock only after a changed
-durable write.
+`nobel-combat.franklin-unlock.v1`; the progression observer in `src/franklin_progression.ts` consumes a completed player
+Warburg or Curie match victory and exposes an unlock only after a changed durable write. Live match
+ticks and explicit `DebugHarness.tick` calls use the same edge observer; `DebugHarness.forceMatch`
+only sets a fixture snapshot and does not invoke it.
 
 **Why.** This preserves deterministic progression tests and keeps browser failures outside `Match`
 and the unlock calculation.
@@ -159,21 +229,25 @@ and the unlock calculation.
 **Consequence.** `readFranklinUnlock` returns `{ state, readFailed }`; malformed records decode to
 locked and thrown reads set `readFailed` while keeping the game playable. `writeFranklinUnlock`
 returns `{ written }`; a failed write leaves Franklin hidden and emits no unlock announcement.
-Storage writes alone do not change the chooser or live region: F6B consumes successful changed
-writes before application state, chooser reveal, or the F5B post-commit seam. AI wins, round wins,
-restart, repeated render/tick calls, forced debug fixtures, and Franklin matches add no progress.
-Startup, read, and write failures remain locked and playable. Browser tests cover durable reload
-and denied storage at the controller boundary. Both real full Nobel-win orders remain locked after
-the first win, unlock durably with one announcement after the second, and reload silently. F6A's
-startup fixture covers denied reads; a denied write preserves the partial record, leaves the session
+Storage writes alone do not change the chooser or live region: the progression observer consumes
+successful changed writes before application state, chooser reveal, or the unlock-announcement
+handler. AI wins, round wins,
+restart, repeated render/tick calls, direct forced-phase fixtures, and Franklin matches add no
+progress. A debug tick that reaches a real player match-over edge uses the same observer, allowing
+the integration harness to validate idempotence after the already-recorded win. Startup, read, and
+write failures remain locked and playable. Browser tests cover durable reload and denied storage
+at the controller boundary. Both real full Nobel-win orders remain locked after
+the first win, unlock durably with one announcement after the second, and reload silently. The
+startup storage fixture covers denied reads; a denied write preserves the partial record, leaves the session
 locked, and produces no unlock or browser error.
 
-**Owner.** `src/franklin_unlock.ts`, `src/franklin_storage.ts`, `src/franklin_progression.ts`, the application controller in `src/main.ts`, and
+**Owner.** `src/franklin_unlock.ts`, `src/franklin_storage.ts`, `src/franklin_progression.ts`,
+`src/debug_harness.ts`, the application controller in `src/main.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
-### Franklin reuses the authored female_31 presentation
+### Franklin reuses the authored female_9 presentation
 
-**Decision.** Use the locally vendored `female_31` rig for Franklin, resolve its display identity
+**Decision.** Use the locally vendored `female_9` rig for Franklin, resolve its display identity
 from `FighterRole`, and retain the asset's authored appearance without adding a Franklin palette.
 
 **Why.** Curie and Franklin are never concurrent in supported match pairs. Reusing the tested
@@ -188,39 +262,40 @@ palette requires measurable visual evidence before it is added.
 
 ### Franklin chooser derives fixture state through the strict decoder
 
-**Decision.** Keep F5A browser fixtures at the same validation boundary as production progression:
+**Decision.** Keep chooser browser fixtures at the same validation boundary as production progression:
 they serialize a candidate unlock record and create the native Franklin option only from
 `decodeFranklinUnlock`'s result.
 
 **Why.** A raw unlocked object would bypass the strict record contract that F3 establishes. The
-decoder-backed fixture proves the chooser consumes the bounded locked/unlocked state while F6A-F6D
-retain ownership of browser storage.
+decoder-backed fixture proves the chooser consumes the bounded locked/unlocked state while the
+storage adapter and progression observer retain ownership of browser storage.
 
 **Consequence.** Before a valid fixture record, the native chooser has exactly Warburg and Curie;
 after decoding a valid unlocked record, it creates Franklin after Curie. Keyboard, D-pad, and stick
 navigation use that dynamic order, and Franklin's help remains limited to her actual standard
-controls. `localStorage` and durable progression remain F6A-F6D work; F5B owns announcement
-presentation, which F6B invokes only after a successful durable write.
+controls. `localStorage` and durable progression remain in the storage adapter and progression
+observer; the application calls the announcement handler only after a successful durable write.
 
 **Owner.** `src/main.ts`, `src/franklin_unlock.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
 ### Franklin unlock presentation follows durable progress
 
-**Decision.** Keep F5B's post-commit unlock handler and match-over `Change fighter` route
-storage-free. F6B calls the handler only after a changed `localStorage.setItem` succeeds; the
+**Decision.** Keep the post-commit unlock handler and match-over `Change fighter` route
+storage-free. The progression observer calls the handler only after a changed
+`localStorage.setItem` succeeds; the
 playtest-only hook that reaches it remains isolated to `playtestMode`.
 
 **Why.** The interface can announce a newly durable unlock and reopen fighter selection without
 making UI code responsible for persistence or allowing a failed write to expose Franklin.
 
 **Consequence.** A decoded already-unlocked record produces no announcement, a failed or unchanged
-write reaches no F5B commit seam, and `Change fighter` is available only at match-over. It preserves
+write reaches no announcement handler, and `Change fighter` is available only at match-over. It preserves
 a valid current Curie or Franklin choice, otherwise falls back to Warburg, while combat stays paused
 until chooser confirmation.
 
-**Owner.** F5B controller behavior in `src/main.ts`; durable storage and the post-write call site
-belong to F6A-F6B in
+**Owner.** Application presentation in `src/main.ts`; durable storage and the post-write call site
+belong to `src/franklin_storage.ts` and `src/franklin_progression.ts` in
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
 ### Debug camera telemetry excludes intentional restart snaps
@@ -234,7 +309,7 @@ Comparing positions across a match restart measures that deliberate reset rather
 Live browser endurance checks measure the rendered camera on consecutive frames.
 
 **Consequence.** Debug stress retains a 4.5-unit physical bound per 12-tick batch away from reset;
-the restart assertion establishes a valid new baseline. Production F7C keeps its stricter
+the restart assertion establishes a valid new baseline. The live browser endurance check keeps its stricter
 under-2.5-units-per-rendered-frame continuity check. Both paths preserve actionable diagnostics.
 
 **Owner.** `tests/playwright/agent_scenarios.mjs`,

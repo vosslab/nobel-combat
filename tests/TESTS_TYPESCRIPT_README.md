@@ -13,7 +13,7 @@ bundle, preview, deployment, and build-aware Playwright front doors.
 | Script | What it does |
 | --- | --- |
 | `./check_codebase.sh` | Fast gate: typecheck, lint, format check, Node unit tests. |
-| `./dist_clean.sh` | Wipe `dist/`. |
+| `npm run clean` | Wipe build output and caches while retaining dependencies. |
 
 The `githubpages` child type additionally provides:
 

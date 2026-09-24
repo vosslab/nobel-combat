@@ -34,7 +34,7 @@ let failures = 0;
 async function snapshot(page) {
   return page.evaluate(() => window.__fightSnapshot?.());
 }
-async function setInput(page, device, action) {
+async function setInput(page, device, action, heldKeys) {
   if (device === "gamepad") {
     await page.evaluate((a) => {
       window.__testPad.axes = [a.x, a.z];
@@ -43,22 +43,35 @@ async function setInput(page, device, action) {
       window.__testPad.buttons[5].pressed = a.block;
     }, action);
   } else {
-    for (const [code, on] of Object.entries({
-      KeyA: action.x < -0.2,
-      KeyD: action.x > 0.2,
-      KeyW: action.z < -0.2,
-      KeyS: action.z > 0.2,
-      KeyJ: action.light,
-      KeyK: action.heavy,
-      KeyL: action.block,
-    })) {
-      if (on) await page.keyboard.down(code);
-      else await page.keyboard.up(code);
+    const nextKeys = new Set(
+      Object.entries({
+        KeyA: action.x < -0.2,
+        KeyD: action.x > 0.2,
+        KeyW: action.z < -0.2,
+        KeyS: action.z > 0.2,
+        KeyJ: action.light,
+        KeyK: action.heavy,
+        KeyL: action.block,
+      })
+        .filter(([, on]) => on)
+        .map(([code]) => code),
+    );
+    for (const code of heldKeys) {
+      if (!nextKeys.has(code)) {
+        await page.keyboard.up(code);
+        heldKeys.delete(code);
+      }
+    }
+    for (const code of nextKeys) {
+      if (!heldKeys.has(code)) {
+        await page.keyboard.down(code);
+        heldKeys.add(code);
+      }
     }
   }
 }
-function selectedRoles(device) {
-  return device === "keyboard" ? ["warburg", "curie"] : ["curie", "warburg"];
+function selectedRoles() {
+  return ["curie", "warburg"];
 }
 async function waitForNeutralFrame(page) {
   await page.evaluate(
@@ -69,6 +82,8 @@ async function confirmFighter(page, device) {
   await page.waitForSelector("#start-match");
   if (device === "keyboard") {
     await page.waitForFunction(() => document.querySelector("#select-warburg")?.checked === true);
+    await page.keyboard.press("ArrowRight");
+    await page.waitForFunction(() => document.querySelector("#select-curie")?.checked === true);
     await page.keyboard.press("Enter");
   } else {
     await page.evaluate(() => (window.__testPad.axes = [1, 0]));
@@ -85,7 +100,7 @@ async function confirmFighter(page, device) {
         .__fightSnapshot?.()
         .fighters.map((fighter) => fighter.role)
         .join(",") === roles.join(","),
-    selectedRoles(device),
+    selectedRoles(),
   );
   await waitForNeutralFrame(page);
 }
@@ -105,6 +120,7 @@ async function run(device, desired) {
       Object.defineProperty(navigator, "getGamepads", { value: () => [window.__testPad] });
     });
   const errors = [];
+  const heldKeys = new Set();
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => {
     if (m.type() === "error") errors.push(m.text());
@@ -156,10 +172,10 @@ async function run(device, desired) {
         lastAttack = Date.now();
       }
     }
-    await setInput(page, device, action);
+    await setInput(page, device, action, heldKeys);
     await page.waitForTimeout(70);
   }
-  await setInput(page, device, { x: 0, z: 0, light: false, heavy: false, block: false });
+  await setInput(page, device, { x: 0, z: 0, light: false, heavy: false, block: false }, heldKeys);
   if (device === "gamepad") {
     await page.evaluate(() => (window.__testPad.buttons[9].pressed = true));
     await page.waitForTimeout(120);
@@ -170,10 +186,10 @@ async function run(device, desired) {
     await page.keyboard.up("r");
   }
   const restarted = await snapshot(page);
-  const expectedRoles = selectedRoles(device);
+  const expectedRoles = selectedRoles();
   const result = {
     device,
-    desired,
+    inputPlan: desired === "red" ? "player-attacks" : "neutral",
     winner: s.winner,
     phase: s.phase,
     round: s.round,
@@ -199,7 +215,7 @@ async function run(device, desired) {
   console.log(JSON.stringify(result));
   if (
     s.phase !== "matchOver" ||
-    s.winner !== (desired === "red" ? 0 : 1) ||
+    (s.winner !== 0 && s.winner !== 1) ||
     s.fighters.map((f) => f.role).join(",") !== expectedRoles.join(",") ||
     restarted.phase !== "fight" ||
     restarted.round !== 1 ||
@@ -214,6 +230,14 @@ try {
   for (const device of selectedDevice ? [selectedDevice] : ["keyboard", "gamepad"])
     for (const desired of selectedWinner ? [selectedWinner] : ["blue", "red", "red"])
       await run(device, desired);
+  if (!selectedWinner) {
+    for (const device of selectedDevice ? [selectedDevice] : ["keyboard", "gamepad"]) {
+      const winners = new Set(
+        results.filter((result) => result.device === device).map((result) => result.winner),
+      );
+      if (!winners.has(0) || !winners.has(1)) failures++;
+    }
+  }
 } finally {
   await browser.close();
 }

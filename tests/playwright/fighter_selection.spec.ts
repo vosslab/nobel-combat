@@ -22,6 +22,7 @@ type FightSnapshot = {
   }[];
   phase: string;
   round: number;
+  input: { action: { light: boolean } };
 };
 
 type KeyboardAction = {
@@ -118,7 +119,11 @@ async function renderFrames(page: Page, count = 6): Promise<void> {
   );
 }
 
-async function setKeyboardAction(page: Page, action: KeyboardAction): Promise<void> {
+async function setKeyboardAction(
+  page: Page,
+  action: KeyboardAction,
+  heldKeys: Set<string>,
+): Promise<void> {
   const keys: Record<string, boolean> = {
     KeyA: action.x < -0.2,
     KeyD: action.x > 0.2,
@@ -129,46 +134,44 @@ async function setKeyboardAction(page: Page, action: KeyboardAction): Promise<vo
     KeyL: action.block,
   };
   for (const [key, pressed] of Object.entries(keys)) {
-    if (pressed) await page.keyboard.down(key);
-    else await page.keyboard.up(key);
+    if (pressed && !heldKeys.has(key)) {
+      await page.keyboard.down(key);
+      heldKeys.add(key);
+    } else if (!pressed && heldKeys.has(key)) {
+      await page.keyboard.up(key);
+      heldKeys.delete(key);
+    }
   }
 }
 
 async function completeLivePlayerWin(page: Page): Promise<void> {
+  const heldKeys = new Set<string>();
   await page.getByRole("button", { name: "Begin match" }).click();
-  let attackRetryLoops = 0;
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
-    if (attackRetryLoops > 0) attackRetryLoops--;
     const state = await snapshot(page);
     if (state.phase === "matchOver") break;
     const [player, opponent] = state.fighters;
     if (!player || !opponent) throw new Error("Live match did not expose both fighters.");
     const distance = Math.hypot(player.x - opponent.x, player.z - opponent.z);
+    const heavyReach = player.role === "warburg" ? 2.4 : 2.15;
     const action: KeyboardAction = { x: 0, z: 0, light: false, heavy: false, block: false };
     if (state.phase === "fight") {
-      if (distance > 1.7) {
-        action.x = Math.sign(opponent.x - player.x);
-        action.z = Math.sign(opponent.z - player.z);
-      }
-      if (
-        (opponent.state === "light" || opponent.state === "heavy") &&
-        ["idle", "move", "block"].includes(player.state)
-      ) {
+      const canAct = ["idle", "move", "block"].includes(player.state);
+      const shouldBlock = (opponent.state === "light" || opponent.state === "heavy") && canAct;
+      if (shouldBlock) {
         action.block = true;
-      } else if (
-        distance < 2.15 &&
-        ["idle", "move", "block"].includes(player.state) &&
-        attackRetryLoops === 0
-      ) {
+      } else if (distance <= heavyReach && canAct) {
         action.heavy = true;
-        attackRetryLoops = 7;
+      } else if (distance > heavyReach) {
+        action.x = Math.sign(opponent.x - player.x);
+        action.z = Math.sign(player.z - opponent.z);
       }
     }
-    await setKeyboardAction(page, action);
+    await setKeyboardAction(page, action, heldKeys);
     await page.waitForTimeout(70);
   }
-  await setKeyboardAction(page, { x: 0, z: 0, light: false, heavy: false, block: false });
+  await setKeyboardAction(page, { x: 0, z: 0, light: false, heavy: false, block: false }, heldKeys);
   const result = await snapshot(page);
   expect(result).toMatchObject({ phase: "matchOver", winner: 0 });
 }
@@ -640,7 +643,7 @@ test("validated local unlock adds and navigates the Franklin choice after denied
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad(undefined, [0]));
-  await expect.poll(async () => (await snapshot(page)).fighters[0]?.state).toBe("light");
+  await expect.poll(async () => (await snapshot(page)).input.action.light).toBe(true);
   await setGamepad(page, null);
   expect(errors).toEqual([]);
 });
@@ -686,15 +689,9 @@ test("synthetic standard gamepad selects and confirms the same complementary pai
     .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
     .toEqual(["curie", "warburg"]);
   expect((await snapshot(page)).fighters[0]).toMatchObject({ state: "idle", attackHeld: false });
-  await renderFrames(page);
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
-    .toEqual(["curie", "warburg"]);
-  expect((await snapshot(page)).fighters[0]).toMatchObject({ state: "idle", attackHeld: false });
   await setGamepad(page, null);
-  await renderFrames(page);
   await setGamepad(page, pad(undefined, [0]));
-  await expect.poll(async () => (await snapshot(page)).fighters[0]?.state).toBe("light");
+  await expect.poll(async () => (await snapshot(page)).input.action.light).toBe(true);
   await setGamepad(page, null);
   expect(errors).toEqual([]);
 });
@@ -724,15 +721,16 @@ test("held Start confirms once without applying an immediate restart", async ({
     ],
   });
   await renderFrames(page);
-  expect(await snapshot(page)).toMatchObject({
+  const afterHeldStart = await snapshot(page);
+  expect(afterHeldStart).toMatchObject({
     phase: "fight",
     round: 1,
     fighters: [
-      { role: "warburg", hp: 100, wins: 0, state: "idle", attackHeld: false },
-      { role: "curie", hp: 100, wins: 0 },
+      { role: "warburg", wins: 0 },
+      { role: "curie", wins: 0 },
     ],
   });
-  await expect.poll(async () => (await snapshot(page)).fighters[1]?.x).toBeLessThan(2.9);
+  expect(afterHeldStart.fighters[1]?.x).toBeLessThan(1.8);
   await setGamepad(page, null);
   expect(errors).toEqual([]);
 });

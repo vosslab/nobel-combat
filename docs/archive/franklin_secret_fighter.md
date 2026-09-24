@@ -428,6 +428,15 @@ exit 1; done` for fail-fast source-to-`dist` identity of every local GLB, then `
   passed 39 tests; every local GLB matched its `dist/` copy; and `git diff --check` passed.
   `git diff -- tsconfig.json tsconfig.lint.json` is empty, preserving repository TypeScript
   standards.
+- Final execution correction: the F1/F4 rows above preserve the initial `female_31` proposal.
+  Runtime presentation uses CC0 Mesh2Motion `female_9` at
+  `assets/models/mesh2motion_female_9.glb` (SHA-256
+  `9a60dd24d126f0118f4dd84a830495c094dc72b9ae89de122ca685f5a78950f8`) for Franklin. The game
+  loads its local role models during startup, so secrecy protects chooser and progression state,
+  not model network requests. The retained `female_31` file is not loaded or copied to production.
+  The older F8 check that all four character-model GLBs match their source digests records the
+  historical build-copy state; it is not the runtime asset manifest. The current build omits
+  `male_5`, which remains a source-level rig compatibility fixture.
 - Repairs confirmed by final validation: the synthetic debug camera telemetry now resets its
   baseline across the intentional restart snap and keeps a 4.5-unit per-12-tick physical bound;
   live rendered-frame continuity remains below 2.5 units per frame. Live fixture selection now
@@ -436,7 +445,7 @@ exit 1; done` for fail-fast source-to-`dist` identity of every local GLB, then `
   assertions retain detailed failure context rather than claiming a gameplay repair.
 - Residual uncertainty: no physical controller or human-feel session was required. Synthetic
   standard-gamepad parity and measurable input, camera, movement, combat-transition, and endurance
-  proxies passed. Projection evidence covers center, feet, and 0–2.7 m head anchors rather than
+  proxies passed. Projection evidence covers center, feet, and 0 to 2.7 m head anchors rather than
   animated limb extrema; pitch/zoom endpoints are tested separately from maximum separation.
   These limits are nonblocking. The reported Pages deployment applies only to
   `ccaf03d00486d190b2dbe9d01a824da829e437f0`, not this uncommitted local work.

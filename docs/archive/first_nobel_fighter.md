@@ -102,3 +102,9 @@ next real playable, based on the official 1903/1911 Nobel records and an existin
 asset. Do not build a generic roster or ability framework; Curie's direct rules and the first
 player-select control can expose whether a small selection flow is now needed. Keep Rosalind
 Franklin's secret unlock as a later explicit milestone.
+
+### Later asset packaging correction
+
+The W1 acceptance used `male_5` as the live AI opponent. After role-specific fighter models were
+integrated, it became a source-level rig compatibility fixture and was removed from production
+build output. Current shipped fighter assets are listed in [`assets/README.md`](../../assets/README.md).

@@ -186,18 +186,29 @@ standard Gamepad API parity and measurable input, camera, movement, combat-trans
 endurance checks pass. The earlier successful GitHub Pages deployment applies only to commit
 `ccaf03d00486d190b2dbe9d01a824da829e437f0`; it does not claim this uncommitted local work.
 
+### Final presentation correction
+
+The C1-C2 rows above record the initial `female_31` model selection and its compatibility experiment.
+The final Curie presentation instead uses the CC0 OpenGameArt Old Lady model in
+`assets/models/curie_period.glb`; Babylon maps the local combat clips with the Curie-only bone map.
+The current asset and output digests are in [`assets/README.md`](../../assets/README.md).
+The build now ships only the three role models. Mesh2Motion `male_5` remains a source-level rig
+compatibility fixture and is excluded from `dist/`; the earlier C7C four-model copy check records
+the historical package contents.
+
 ## C8 evidence
 
 [`franklin_secret_fighter.md`](franklin_secret_fighter.md) is the completed follow-on plan.
 It names Franklin accurately as a hidden contributor rather than a laureate; records direct Nobel,
 King's College London, and primary-paper sources; reuses the already vendored CC0
-`female_31.glb` asset; and keeps the two-slot deterministic combat contract intact. Its F1-F8
+`female_31.glb` candidate as proposed at handoff; and keeps the two-slot deterministic combat contract intact. Its F1-F8
 milestones separately cover role pairing, a strict versioned unlock reducer, presentation, the
 accessible chooser and match-over change route, live persistence, automated secrecy and endurance,
-and closure. Every completion condition is automated; shared-asset loading is explicitly excluded
-from the pre-unlock secrecy condition because Curie already uses that GLB. The plan fails closed
-when storage reads or writes fail, and announces Franklin only once after the second distinct
-player-role victory is durably written.
+and closure. Every completion condition is automated. The final implementation's local asset
+loading is not a secrecy boundary; the chooser and progression state remain hidden until unlock. The
+plan fails closed when storage reads or writes fail, and announces Franklin only once after the
+second distinct player-role victory is durably written. The Franklin plan records its final
+`female_9` execution correction.
 
 ## Recovery rules
 

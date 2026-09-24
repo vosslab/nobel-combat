@@ -26,7 +26,8 @@ const browserStorage = (): FranklinUnlockStorage => window.localStorage;
  * ASVS V1.5.2/V2.2.1: stored JSON is accepted only through the reducer's
  * strict allowlisted decoder. ASVS V14.3.3: this key holds only a version and
  * non-sensitive Nobel-role win flags. ASVS V16.5.2/.3: denied storage leaves
- * the game locked and playable. F6B owns the V2.3.1 progression sequence.
+ * the game locked and playable. The progression observer enforces valid
+ * completed-match transitions (ASVS V2.3.1).
  */
 export function readFranklinUnlock(
   provider: FranklinUnlockStorageProvider = browserStorage,

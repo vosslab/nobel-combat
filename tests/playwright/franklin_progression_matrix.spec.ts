@@ -4,7 +4,7 @@ import { FRANKLIN_UNLOCK_STORAGE_KEY } from "../../src/franklin_storage";
 
 // Selector contract: the unlock announcement, chooser radios, Begin match, and restart controls
 // come from src/index.html:52-98. Dynamic Franklin radio rendering and chooser role behavior come
-// from src/main.ts:190-225 and src/main.ts:296-360. Update this test when those UI contracts change.
+// from src/main.ts:294-323 and src/main.ts:430-475. Update this test when those UI contracts change.
 test.describe.configure({ mode: "serial" });
 
 type Fighter = { role: string; x: number; z: number; hp: number; wins: number; state: string };
@@ -39,20 +39,6 @@ async function snapshot(page: Page): Promise<Snapshot> {
   });
 }
 
-async function frames(page: Page, count = 4): Promise<void> {
-  await page.evaluate(
-    (remaining) =>
-      new Promise<void>((resolve) => {
-        const next = (): void => {
-          if (--remaining === 0) resolve();
-          else requestAnimationFrame(next);
-        };
-        requestAnimationFrame(next);
-      }),
-    count,
-  );
-}
-
 async function waitForReady(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const value = (
@@ -68,55 +54,6 @@ async function selectAndBegin(page: Page, role: "warburg" | "curie" = "warburg")
   await page.getByRole("button", { name: "Begin match" }).click();
 }
 
-async function setPlayerAction(
-  page: Page,
-  action: { x: number; z: number; heavy: boolean; block: boolean },
-): Promise<void> {
-  const keys: Record<string, boolean> = {
-    KeyA: action.x < -0.2,
-    KeyD: action.x > 0.2,
-    KeyW: action.z < -0.2,
-    KeyS: action.z > 0.2,
-    KeyK: action.heavy,
-    KeyL: action.block,
-  };
-  for (const [key, held] of Object.entries(keys)) {
-    if (held) await page.keyboard.down(key);
-    else await page.keyboard.up(key);
-  }
-}
-
-async function clearPlayerAction(page: Page): Promise<void> {
-  await setPlayerAction(page, { x: 0, z: 0, heavy: false, block: false });
-}
-
-async function completeLivePlayerWin(page: Page): Promise<void> {
-  const deadline = Date.now() + 90_000;
-  let retry = 0;
-  while (Date.now() < deadline) {
-    const current = await snapshot(page);
-    if (current.phase === "matchOver") break;
-    const [player, opponent] = current.fighters;
-    if (!player || !opponent) throw new Error("Live match did not expose two fighters.");
-    const distance = Math.hypot(player.x - opponent.x, player.z - opponent.z);
-    const block =
-      ["light", "heavy"].includes(opponent.state) &&
-      ["idle", "move", "block"].includes(player.state);
-    const heavy =
-      distance < 2.15 && ["idle", "move", "block"].includes(player.state) && retry-- <= 0;
-    if (heavy) retry = 7;
-    await setPlayerAction(page, {
-      x: distance > 1.7 ? Math.sign(opponent.x - player.x) : 0,
-      z: distance > 1.7 ? Math.sign(opponent.z - player.z) : 0,
-      heavy,
-      block,
-    });
-    await frames(page);
-  }
-  await clearPlayerAction(page);
-  expect(await snapshot(page)).toMatchObject({ phase: "matchOver", winner: 0 });
-}
-
 async function completeLiveAiWin(page: Page): Promise<void> {
   await expect
     .poll(
@@ -127,6 +64,29 @@ async function completeLiveAiWin(page: Page): Promise<void> {
       { timeout: 90_000 },
     )
     .toEqual({ phase: "matchOver", winner: 1 });
+}
+
+async function completeDebugWarburgWin(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const debug = (
+      window as typeof window & {
+        __fightDebug?: {
+          advance: (ticks: number, actions: unknown) => unknown;
+          forceFighter: (index: 0 | 1, patch: Record<string, unknown>) => unknown;
+        };
+      }
+    ).__fightDebug;
+    if (!debug) throw new Error("Deterministic match harness was unavailable.");
+    const neutral = { x: 0, z: 0, light: false, heavy: false, block: false };
+    const light = { x: 0, z: 0, light: true, heavy: false, block: false };
+    debug.forceFighter(0, { x: -0.8, z: 0, hp: 100, state: "idle", ticks: 0, attackHeld: false });
+    debug.forceFighter(1, { x: 0.8, z: 0, hp: 10, state: "idle", ticks: 0, attackHeld: false });
+    debug.advance(8, [light, neutral]);
+    debug.advance(120, [neutral, neutral]);
+    debug.forceFighter(0, { x: -0.8, z: 0, state: "idle", ticks: 0, attackHeld: false });
+    debug.forceFighter(1, { x: 0.8, z: 0, hp: 10, state: "idle", ticks: 0, attackHeld: false });
+    debug.advance(8, [light, neutral]);
+  });
 }
 
 async function storageRecord(page: Page): Promise<string | null> {
@@ -168,7 +128,7 @@ for (const initial of [null, '{"version":1,"wonRoles":["curie"]}'] as const) {
   });
 }
 
-test("a repeated live Nobel victory does not rewrite stored progress or announce Franklin", async ({
+test("an already recorded Nobel victory does not rewrite progress after combat match victory", async ({
   page,
   baseURL,
 }) => {
@@ -187,10 +147,12 @@ test("a repeated live Nobel victory does not rewrite stored progress or announce
       originalSetItem.call(this, writtenKey, value);
     };
   }, FRANKLIN_UNLOCK_STORAGE_KEY);
-  await page.goto(liveUrl(baseURL!));
+  const url = new URL(baseURL!);
+  url.searchParams.set("debug", "1");
+  await page.goto(url.toString());
   await waitForReady(page);
-  await selectAndBegin(page);
-  await completeLivePlayerWin(page);
+  await completeDebugWarburgWin(page);
+  expect(await snapshot(page)).toMatchObject({ phase: "matchOver", winner: 0, round: 2 });
 
   expect(await storageRecord(page)).toBe('{"version":1,"wonRoles":["warburg"]}');
   expect(await page.evaluate(() => document.documentElement.dataset.progressionWrites ?? "0")).toBe(

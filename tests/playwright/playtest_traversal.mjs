@@ -73,6 +73,13 @@ async function confirmFighter(page, device) {
 }
 async function run(device) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await page.addInitScript(() => {
+    let value = 0x0f7c0001;
+    Object.defineProperty(Math, "random", {
+      configurable: true,
+      value: () => (value = (Math.imul(value, 1_664_525) + 1_013_904_223) >>> 0) / 2 ** 32,
+    });
+  });
   if (device === "gamepad")
     await page.addInitScript(() => {
       window.__testPad = {
@@ -148,29 +155,91 @@ async function run(device) {
   } else {
     await page.keyboard.down("ArrowRight");
   }
-  await sample(400);
+  await sample(200);
   if (device === "gamepad") {
     await page.evaluate(() => (window.__testPad.buttons[15].pressed = false));
   } else {
     await page.keyboard.up("ArrowRight");
   }
   const afterDirectional = (await page.evaluate(() => window.__fightSnapshot())).fighters[0].x;
+
+  // The traversal portion can leave either fighter in a long hit reaction.
+  // Start the live attack probe from a fresh, observable match state instead
+  // of assuming eight short taps will land during the AI's next opening.
+  await control(page, device, 0, 0, "restart");
+  await page.waitForFunction(() => {
+    const s = window.__fightSnapshot?.();
+    return s?.phase === "fight" && s.round === 1 && s.fighters.every((f) => f.hp === 100);
+  });
+  await control(page, device, 0, 0);
+
   let lightHit = false;
-  for (let attempt = 0; attempt < 8 && !lightHit; attempt++) {
+  for (let attempt = 0; attempt < 45 && !lightHit; attempt++) {
     s = await page.evaluate(() => window.__fightSnapshot());
     const [red, blue] = s.fighters;
     const distance = Math.hypot(red.x - blue.x, red.z - blue.z);
-    if (distance > 1.65) {
-      await control(page, device, Math.sign(blue.x - red.x), Math.sign(blue.z - red.z));
-      await sample(300);
-    } else {
-      await control(page, device, 0, 0, "light");
-      await sample(130);
+    if (
+      s.phase !== "fight" ||
+      red.state === "down" ||
+      red.state === "getup" ||
+      blue.state === "down"
+    ) {
+      await control(page, device, 0, 0, "restart");
+      await page.waitForFunction(() => {
+        const current = window.__fightSnapshot?.();
+        return (
+          current?.phase === "fight" &&
+          current.round === 1 &&
+          current.fighters.every((f) => f.hp === 100)
+        );
+      });
       await control(page, device, 0, 0);
-      await sample(400);
-      lightHit = (await page.evaluate(() => window.__fightSnapshot())).fighters[1].hp < 100;
+    } else if (distance > 1.65) {
+      await control(page, device, Math.sign(blue.x - red.x), Math.sign(blue.z - red.z));
+      await page.waitForTimeout(70);
+    } else {
+      await control(page, device, 0, 0);
+      await page.waitForTimeout(70);
+      const ready = await page.evaluate(() => {
+        const current = window.__fightSnapshot();
+        return ["idle", "move", "block"].includes(current.fighters[0].state);
+      });
+      if (!ready) continue;
+      const hpBefore = (await page.evaluate(() => window.__fightSnapshot())).fighters[1].hp;
+      await control(page, device, 0, 0, "light");
+      let attackStarted = false;
+      try {
+        await page.waitForFunction(
+          () => window.__fightSnapshot?.().fighters[0].state === "light",
+          undefined,
+          { timeout: 1000 },
+        );
+        attackStarted = true;
+      } catch {
+        // Retry from the next observable opening; this can happen when the AI
+        // knocks the player down between the readiness sample and input tick.
+      }
+      await control(page, device, 0, 0);
+      if (attackStarted) {
+        try {
+          await page.waitForFunction(
+            (previousHp) => window.__fightSnapshot?.().fighters[1].hp < previousHp,
+            hpBefore,
+            { timeout: 1200 },
+          );
+          lightHit = true;
+        } catch {
+          // A blocked or out-of-range swing is still retried after recovery.
+        }
+      }
     }
   }
+  // Isolate block observation from damage carried over from the traversal and
+  // attack probes. Begin the held-block sample from a fresh round so the live
+  // fighter can enter block before the AI's approach connects.
+  await control(page, device, 0, 0, "restart");
+  await sample(150);
+  await control(page, device, 0, 0);
   await control(page, device, 0, 0, "block");
   await sample(1200);
   await control(page, device, 0, 0);

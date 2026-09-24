@@ -109,6 +109,79 @@ async function captureCurieSeparationStep(page, directory) {
   await page.screenshot({ path: resolve(directory, "curie-separation-step.png") });
 }
 
+async function captureWarburgManometer(page, directory, opponentRole) {
+  await page.evaluate((opponentRole) => {
+    const fight = window.__fightDebug;
+    fight.restart();
+    fight.forceFighter(0, {
+      role: "warburg",
+      x: -1.2,
+      z: 0,
+      state: "heavy",
+      ticks: 32,
+      attackHeld: true,
+      hitDone: false,
+    });
+    fight.forceFighter(1, {
+      role: opponentRole,
+      x: 1.2,
+      z: 0,
+      state: "idle",
+      ticks: 0,
+      attackHeld: false,
+      hitDone: false,
+    });
+  }, opponentRole);
+  await settle(page);
+  const startup = await page.evaluate(() => window.__fightSnapshot?.());
+  const startupVisual = startup?.rigs?.find(
+    (rig) => rig.fighterName === "Otto Heinrich Warburg",
+  )?.researchVisual;
+  assert(startupVisual, "Warburg model is missing its gauge and manometer presentation");
+  assert(startupVisual.flowActive, "manometer pulse did not activate with Oxygen Transfer");
+  assert(startupVisual.flowProgress === 0, "manometer pulse did not begin at zero progress");
+
+  await page.evaluate(() => {
+    const neutral = { x: 0, z: 0, light: false, heavy: false, block: false };
+    window.__fightDebug.advance(24, [neutral, neutral]);
+  });
+  await settle(page);
+  await page.waitForTimeout(200);
+  const active = await page.evaluate(() => window.__fightSnapshot?.());
+  const activeVisual = active?.rigs?.find(
+    (rig) => rig.fighterName === "Otto Heinrich Warburg",
+  )?.researchVisual;
+  assert(activeVisual?.flowActive, "Oxygen Transfer did not animate the manometer pulse");
+  assert(
+    activeVisual.flowProgress > 0.6 && activeVisual.flowProgress < 0.8,
+    `manometer pulse progress was ${activeVisual.flowProgress}, expected 0.75 after 24 ticks`,
+  );
+  assert(
+    activeVisual.gaugeAngle > startupVisual.gaugeAngle,
+    "pressure gauge needle did not respond to Oxygen Transfer startup",
+  );
+  await page.screenshot({ path: resolve(directory, "warburg-oxygen-transfer-manometer.png") });
+
+  await page.evaluate(() =>
+    window.__fightDebug.forceFighter(0, {
+      state: "idle",
+      ticks: 0,
+      attackHeld: false,
+      hitDone: false,
+    }),
+  );
+  await settle(page);
+  const recovered = await page.evaluate(() => window.__fightSnapshot?.());
+  const recoveredVisual = recovered?.rigs?.find(
+    (rig) => rig.fighterName === "Otto Heinrich Warburg",
+  )?.researchVisual;
+  assert(
+    recoveredVisual && !recoveredVisual.flowActive,
+    "manometer pulse remained active after the move",
+  );
+  assert(recoveredVisual.flowProgress === 0, "manometer flow did not reset after the move");
+}
+
 async function main() {
   const directory = outputDirectory();
   const opponentRole = readOption("--opponent", "curie");
@@ -133,12 +206,30 @@ async function main() {
       const snapshot = await page.evaluate(() => window.__fightSnapshot?.());
       assert(snapshot?.fighters?.length === 2, `${state}: missing fighter snapshot`);
       assert(
+        snapshot.models?.filter((model) => model.enabled).length === 2,
+        `${state}: inactive character models must remain hidden`,
+      );
+      assert(
+        snapshot.rigs?.every((rig) =>
+          snapshot.models.some((model) => model.rootId === rig.rootId && model.enabled),
+        ),
+        `${state}: both combatants must use visible presentation rigs`,
+      );
+      assert(
         snapshot.fighters.every((fighter) => fighter.state === state),
         `${state}: combat state did not apply to both fighters`,
       );
       assert(
         snapshot.rigs?.every((rig) => rig.activeClip === state && !rig.disposed),
         `${state}: visual animation did not synchronize with both fighters`,
+      );
+      const warburgVisual = snapshot.rigs?.find(
+        (rig) => rig.fighterName === "Otto Heinrich Warburg",
+      )?.researchVisual;
+      assert(warburgVisual, `${state}: Warburg's gauge and manometer were missing`);
+      assert(
+        warburgVisual.flowActive === (state === "heavy"),
+        `${state}: manometer pulse did not follow the Oxygen Transfer combat state`,
       );
       assert(
         snapshot.rigs?.[0]?.fighterName ===
@@ -150,6 +241,7 @@ async function main() {
       await page.screenshot({ path: resolve(directory, `${state}.png`) });
     }
     if (opponentRole === "curie") await captureCurieSeparationStep(page, directory);
+    await captureWarburgManometer(page, directory, opponentRole);
     assert(errors.length === 0, `browser console errors: ${errors.join(" | ")}`);
     console.log(
       JSON.stringify({ directory, opponentRole, states: STATES.map(([state]) => state), errors }),

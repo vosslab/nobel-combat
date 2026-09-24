@@ -47,7 +47,7 @@ const makeFighter = (x: number, role: FighterRole): Fighter => ({
 });
 
 export class Match {
-  fighters: [Fighter, Fighter] = [makeFighter(-3, "warburg"), makeFighter(3, "opponent")];
+  fighters: [Fighter, Fighter] = [makeFighter(-1.8, "warburg"), makeFighter(1.8, "opponent")];
   playerRole: PlayerFighterRole = "warburg";
   private selectionActive = false;
   phase: Phase = "fight";
@@ -75,7 +75,7 @@ export class Match {
         ? "curie"
         : "warburg"
       : "opponent";
-    this.fighters = [makeFighter(-3, this.playerRole), makeFighter(3, aiRole)];
+    this.fighters = [makeFighter(-1.8, this.playerRole), makeFighter(1.8, aiRole)];
     this.fighters[0].wins = wins[0] ?? 0;
     this.fighters[1].wins = wins[1] ?? 0;
     this.phase = "fight";

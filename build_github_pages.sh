@@ -12,7 +12,7 @@
 #     Aborts with an actionable error if neither exists.
 #   - Verifies src/index.html and src/style.css exist before copying;
 #     aborts with an actionable error if missing.
-#   - Verifies src/index.html references dist/main.js with a module script
+#   - Verifies src/index.html references main.js with a module script
 #     tag (warns if missing -- the page will load but main.js is dead).
 #   - Bundles the entry into dist/main.js with esbuild (ESM, es2020,
 #     browser, minified, with sourcemap).
@@ -40,16 +40,18 @@ fi
 for required in \
 	src/index.html \
 	src/style.css \
-	assets/models/mesh2motion_male_5.glb \
 	assets/models/mesh2motion_doctor_m.glb \
-	assets/models/mesh2motion_female_31.glb \
+	assets/models/curie_period.glb \
+	assets/models/mesh2motion_female_9.glb \
 	assets/animations/mesh2motion_human_base.glb \
 	assets/animations/mesh2motion_human_addon.glb; do
 	if [ ! -f "$required" ]; then
 		echo "ERROR: required source file missing: $required" >&2
 		case "$required" in
 			src/index.html)
-				echo "  Create src/index.html with a <script type=\"module\" src=\"main.js\"></script> tag." >&2 ;;
+				printf '%s\n' \
+					'  Create src/index.html with a <script type="module" src="main.js"></script> tag.' >&2
+				;;
 			src/style.css)
 				echo "  Create src/style.css (empty file is fine)." >&2 ;;
 		esac
@@ -81,18 +83,18 @@ npx esbuild "$ENTRY" \
 cp src/index.html dist/index.html
 cp src/style.css dist/style.css
 mkdir -p dist/assets/models dist/assets/animations
-cp assets/models/mesh2motion_male_5.glb dist/assets/models/
 cp assets/models/mesh2motion_doctor_m.glb dist/assets/models/
-cp assets/models/mesh2motion_female_31.glb dist/assets/models/
+cp assets/models/curie_period.glb dist/assets/models/
+cp assets/models/mesh2motion_female_9.glb dist/assets/models/
 cp assets/animations/mesh2motion_human_base.glb dist/assets/animations/
 cp assets/animations/mesh2motion_human_addon.glb dist/assets/animations/
 touch dist/.nojekyll
 
 test -f dist/index.html
 test -f dist/main.js
-test -s dist/assets/models/mesh2motion_male_5.glb
 test -s dist/assets/models/mesh2motion_doctor_m.glb
-test -s dist/assets/models/mesh2motion_female_31.glb
+test -s dist/assets/models/curie_period.glb
+test -s dist/assets/models/mesh2motion_female_9.glb
 test -s dist/assets/animations/mesh2motion_human_base.glb
 test -s dist/assets/animations/mesh2motion_human_addon.glb
 

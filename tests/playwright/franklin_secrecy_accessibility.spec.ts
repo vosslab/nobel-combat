@@ -4,8 +4,8 @@ import { FRANKLIN_UNLOCK_STORAGE_KEY } from "../../src/franklin_storage";
 
 // Selector contract: chooser, role-radio labels, Begin match, fighter-choice IDs, and the polite
 // announcement host come from src/index.html:52-85. Franklin's dynamic role radio and unlocked
-// help text come from src/main.ts:190-225; chooser confirmation, focus, and navigation come from
-// src/main.ts:296-360. Update this test when those user-facing contracts change.
+// help text come from src/main.ts:294-323; chooser confirmation, focus, and navigation come from
+// src/main.ts:430-475. Update this test when those user-facing contracts change.
 test.describe.configure({ mode: "serial" });
 
 type GamepadFixture = { mapping: string; axes: number[]; buttons: { pressed: boolean }[] };
@@ -119,7 +119,6 @@ async function releaseNavigation(page: Page): Promise<void> {
 
 async function completeLiveWarburgWin(page: Page): Promise<void> {
   const deadline = Date.now() + 90_000;
-  let attackRetry = 0;
   while (Date.now() < deadline) {
     const state = await matchState(page);
     if (state.phase === "matchOver") break;
@@ -129,9 +128,7 @@ async function completeLiveWarburgWin(page: Page): Promise<void> {
     const shouldBlock =
       (opponent.state === "light" || opponent.state === "heavy") &&
       ["idle", "move", "block"].includes(player.state);
-    const shouldAttack =
-      distance < 2.15 && ["idle", "move", "block"].includes(player.state) && attackRetry-- <= 0;
-    if (shouldAttack) attackRetry = 7;
+    const shouldAttack = distance < 2.15 && ["idle", "move", "block"].includes(player.state);
     if (distance > 1.7) {
       await page.keyboard.down(opponent.x > player.x ? "KeyD" : "KeyA");
       await page.keyboard.down(opponent.z > player.z ? "KeyS" : "KeyW");

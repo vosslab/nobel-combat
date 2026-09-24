@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { createAi } from "../src/ai.ts";
+import { createAi, createRandomSource } from "../src/ai.ts";
 import { Match, NEUTRAL } from "../src/match.ts";
 
 function sequence(values) {
@@ -20,6 +20,16 @@ function actionIsBounded(action) {
     typeof action.block === "boolean"
   );
 }
+
+test("seeded AI random sources repeat independently of render-side randomness", () => {
+  const first = createRandomSource(0x1977);
+  const second = createRandomSource(0x1977);
+  const firstValues = Array.from({ length: 12 }, first);
+  const secondValues = Array.from({ length: 12 }, second);
+
+  assert.deepEqual(firstValues, secondValues);
+  assert.ok(firstValues.every((value) => value >= 0 && value < 1));
+});
 
 test("AI approaches from maximum separation with bounded actions", () => {
   const match = new Match();
@@ -72,6 +82,69 @@ test("AI blocks for a bounded reaction delay after taking damage", () => {
   }
   assert.equal(blocks, 27);
   assert.equal(ai(match).block, false);
+});
+
+test("role-aware AI activates existing Warburg and Curie moves", () => {
+  const warburgMatch = new Match();
+  warburgMatch.selectPlayer("curie");
+  warburgMatch.fighters[0].x = -1.8;
+  warburgMatch.fighters[1].x = 0.5;
+  const warburgAi = createAi(() => 0.9);
+  const lactateDrive = warburgAi(warburgMatch);
+  assert.deepEqual(
+    { light: lactateDrive.light, heavy: lactateDrive.heavy, block: lactateDrive.block },
+    { light: true, heavy: true, block: false },
+  );
+  warburgMatch.tick([NEUTRAL, lactateDrive]);
+  assert.equal(warburgMatch.fighters[1].lactateDrive, true);
+
+  const glycolysisMatch = new Match();
+  glycolysisMatch.selectPlayer("curie");
+  glycolysisMatch.fighters[0].x = -1.8;
+  glycolysisMatch.fighters[1].x = 0.8;
+  const glycolysisAi = createAi(() => 0.9);
+  const glycolysis = glycolysisAi(glycolysisMatch);
+  assert.deepEqual(
+    { light: glycolysis.light, heavy: glycolysis.heavy, block: glycolysis.block },
+    { light: true, heavy: false, block: true },
+  );
+  glycolysisMatch.tick([NEUTRAL, glycolysis]);
+  assert.equal(glycolysisMatch.fighters[1].aerobicOutputTicks, 72);
+  assert.equal(glycolysisMatch.fighters[1].aerobicLightReady, true);
+
+  const curieMatch = new Match();
+  curieMatch.selectPlayer("warburg");
+  curieMatch.fighters[0].x = -1.8;
+  curieMatch.fighters[1].x = 0;
+  const curieAi = createAi(() => 0.9);
+  const separationStep = curieAi(curieMatch);
+  assert.deepEqual(
+    { light: separationStep.light, heavy: separationStep.heavy, block: separationStep.block },
+    { light: true, heavy: false, block: true },
+  );
+  curieMatch.tick([NEUTRAL, separationStep]);
+  assert.equal(curieMatch.fighters[1].separationStep, true);
+});
+
+test("Warburg AI uses its powered-light window on its next attack", () => {
+  const match = new Match();
+  match.selectPlayer("curie");
+  match.fighters[0].x = -0.8;
+  match.fighters[1].x = 0.8;
+  match.fighters[1].aerobicOutputTicks = 12;
+  match.fighters[1].aerobicLightReady = true;
+  const ai = createAi(() => 0.9);
+
+  const action = ai(match);
+  assert.deepEqual(
+    { light: action.light, heavy: action.heavy, block: action.block },
+    { light: true, heavy: false, block: false },
+  );
+  match.tick([NEUTRAL, action]);
+  for (let tick = 0; tick < 8; tick++) match.tick([NEUTRAL, ai(match)]);
+
+  assert.equal(match.fighters[0].hp, 86);
+  assert.equal(match.fighters[1].aerobicLightReady, false);
 });
 
 test("AI wins long seeded matches without unbounded or unexplained distant idle actions", () => {

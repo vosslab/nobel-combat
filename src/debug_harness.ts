@@ -214,9 +214,11 @@ function validateMatch(match: Pick<Match, "phase" | "round" | "winner" | "phaseT
  */
 export class DebugHarness {
   private readonly match: Match;
+  private readonly afterTick: ((previousPhase: Phase) => void) | undefined;
 
-  constructor(match: Match = new Match()) {
+  constructor(match: Match = new Match(), afterTick?: (previousPhase: Phase) => void) {
     this.match = match;
+    this.afterTick = afterTick;
   }
 
   tick(actions: readonly [Action, Action] = [NEUTRAL, NEUTRAL]): DebugMatchSnapshot {
@@ -224,7 +226,9 @@ export class DebugHarness {
       throw new Error("Actions must contain exactly two actions");
     }
     const copiedActions: [Action, Action] = [copyAction(actions[0]), copyAction(actions[1])];
+    const previousPhase = this.match.phase;
     this.match.tick(copiedActions);
+    this.afterTick?.(previousPhase);
     return this.snapshot();
   }
 
