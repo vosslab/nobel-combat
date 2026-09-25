@@ -1,11 +1,16 @@
 import { Match, NEUTRAL } from "./match";
 import type { Action, Fighter, Phase, State } from "./match";
+import { isFighterId } from "./roster/roster";
+import type { FighterId } from "./roster/roster";
+import type { Effect } from "./specials";
+import type { Block } from "./roster/fighter_def";
 
-export type DebugFighterPatch = Partial<Fighter>;
+export type DebugFighterPatch = Partial<Omit<Fighter, "id">>;
 export type DebugMatchPatch = Partial<Pick<Match, "phase" | "round" | "winner" | "phaseTicks">>;
 export type DebugFighterSnapshot = Readonly<Fighter>;
 export type DebugMatchSnapshot = Readonly<{
   fighters: readonly [DebugFighterSnapshot, DebugFighterSnapshot];
+  effects: readonly Effect[];
   phase: Phase;
   round: number;
   winner: number | null;
@@ -24,7 +29,6 @@ const STATES: readonly State[] = [
 ];
 const PHASES: readonly Phase[] = ["fight", "roundOver", "matchOver"];
 const FIGHTER_FIELDS: ReadonlySet<string> = new Set([
-  "role",
   "x",
   "z",
   "hp",
@@ -34,21 +38,25 @@ const FIGHTER_FIELDS: ReadonlySet<string> = new Set([
   "ticks",
   "hitDone",
   "attackHeld",
-  "lactateDrive",
-  "lactateDriveCooldown",
-  "aerobicOutputTicks",
-  "aerobicGlycolysisCooldown",
-  "aerobicLightReady",
-  "separationStep",
-  "separationStepCooldown",
+  "specialHeld",
+  "specialTicks",
+  "meter",
+  "damageTaken",
 ]);
 const MATCH_FIELDS: ReadonlySet<string> = new Set(["phase", "round", "winner", "phaseTicks"]);
-const ACTION_FIELDS: ReadonlySet<string> = new Set(["x", "z", "light", "heavy", "block"]);
+const ACTION_FIELDS: ReadonlySet<string> = new Set([
+  "x",
+  "z",
+  "light",
+  "heavy",
+  "block",
+  "special",
+]);
 const STATE_TICK_LIMITS: Readonly<Record<State, readonly [number, number]>> = {
   idle: [0, 0],
   move: [0, 0],
   light: [1, 24],
-  heavy: [1, 36],
+  heavy: [1, 40],
   block: [0, 8],
   hit: [1, 18],
   down: [1, 72],
@@ -115,6 +123,7 @@ function validateAction(action: Action): void {
   validateBoolean("Action light", action.light);
   validateBoolean("Action heavy", action.heavy);
   validateBoolean("Action block", action.block);
+  validateBoolean("Action special", action.special);
 }
 
 function copyAction(action: Action): Action {
@@ -125,13 +134,14 @@ function copyAction(action: Action): Action {
     light: action.light,
     heavy: action.heavy,
     block: action.block,
+    special: action.special,
   };
   return copied;
 }
 
 function copyFighter(fighter: Fighter): DebugFighterSnapshot {
   const copied = {
-    role: fighter.role,
+    id: fighter.id,
     x: fighter.x,
     z: fighter.z,
     hp: fighter.hp,
@@ -141,26 +151,40 @@ function copyFighter(fighter: Fighter): DebugFighterSnapshot {
     ticks: fighter.ticks,
     hitDone: fighter.hitDone,
     attackHeld: fighter.attackHeld,
-    lactateDrive: fighter.lactateDrive,
-    lactateDriveCooldown: fighter.lactateDriveCooldown,
-    aerobicOutputTicks: fighter.aerobicOutputTicks,
-    aerobicGlycolysisCooldown: fighter.aerobicGlycolysisCooldown,
-    aerobicLightReady: fighter.aerobicLightReady,
-    separationStep: fighter.separationStep,
-    separationStepCooldown: fighter.separationStepCooldown,
+    specialHeld: fighter.specialHeld,
+    specialTicks: fighter.specialTicks,
+    meter: fighter.meter,
+    damageTaken: fighter.damageTaken,
   };
   return Object.freeze(copied);
 }
 
+function copyBlock<BlockType extends Block>(block: BlockType): BlockType {
+  const onHit = block.onHit?.map(copyBlock);
+  return Object.freeze({
+    ...block,
+    ...(onHit === undefined ? {} : { onHit: Object.freeze(onHit) }),
+  }) as BlockType;
+}
+
+function copyEffect(effect: Effect): Effect {
+  switch (effect.kind) {
+    case "scheduled":
+      return Object.freeze({ ...effect, block: copyBlock(effect.block) });
+    case "projectile":
+      return Object.freeze({ ...effect, block: copyBlock(effect.block) });
+    case "zone":
+      return Object.freeze({ ...effect, block: copyBlock(effect.block) });
+    case "shield":
+      return Object.freeze({ ...effect, block: copyBlock(effect.block) });
+    case "modifier":
+      return Object.freeze({ ...effect });
+  }
+}
+
 function validateFighter(fighter: Fighter): void {
-  validateAllowedKeys(fighter, FIGHTER_FIELDS, "fighter");
-  if (
-    fighter.role !== "warburg" &&
-    fighter.role !== "curie" &&
-    fighter.role !== "franklin" &&
-    fighter.role !== "opponent"
-  ) {
-    throw new Error(`Unknown fighter role: ${String(fighter.role)}`);
+  if (!isFighterId(fighter.id)) {
+    throw new Error(`Unknown fighter id: ${String(fighter.id)}`);
   }
   validateNumber("Fighter x", fighter.x, -9, 9);
   validateNumber("Fighter z", fighter.z, -6, 6);
@@ -170,29 +194,22 @@ function validateFighter(fighter: Fighter): void {
   if (!validState(fighter.state)) {
     throw new Error(`Unknown fighter state: ${fighter.state}`);
   }
-  const [minimumTicks, maximumTicks] = STATE_TICK_LIMITS[fighter.state];
-  validateNumber("Fighter ticks", fighter.ticks, minimumTicks, maximumTicks, true);
+  if (fighter.specialTicks > 0) {
+    if (fighter.state !== "light" && fighter.state !== "heavy" && fighter.state !== "block") {
+      throw new Error("An active special must use its authored pose");
+    }
+    validateNumber("Fighter ticks", fighter.ticks, 1, 96, true);
+    validateNumber("Fighter specialTicks", fighter.specialTicks, 1, fighter.ticks, true);
+  } else {
+    const [minimumTicks, maximumTicks] = STATE_TICK_LIMITS[fighter.state];
+    validateNumber("Fighter ticks", fighter.ticks, minimumTicks, maximumTicks, true);
+    validateNumber("Fighter specialTicks", fighter.specialTicks, 0, 0, true);
+  }
   validateBoolean("Fighter hitDone", fighter.hitDone);
   validateBoolean("Fighter attackHeld", fighter.attackHeld);
-  validateBoolean("Fighter lactateDrive", fighter.lactateDrive);
-  validateNumber("Fighter lactateDriveCooldown", fighter.lactateDriveCooldown, 0, 44, true);
-  validateNumber("Fighter aerobicOutputTicks", fighter.aerobicOutputTicks, 0, 72, true);
-  validateNumber(
-    "Fighter aerobicGlycolysisCooldown",
-    fighter.aerobicGlycolysisCooldown,
-    0,
-    150,
-    true,
-  );
-  validateBoolean("Fighter aerobicLightReady", fighter.aerobicLightReady);
-  validateBoolean("Fighter separationStep", fighter.separationStep);
-  validateNumber("Fighter separationStepCooldown", fighter.separationStepCooldown, 0, 72, true);
-  if (fighter.lactateDrive && fighter.state !== "light") {
-    throw new Error("Fighter Lactate Drive can only be active during a light attack");
-  }
-  if (fighter.separationStep && fighter.state !== "light") {
-    throw new Error("Fighter Separation Step can only be active during a light attack");
-  }
+  validateBoolean("Fighter specialHeld", fighter.specialHeld);
+  validateNumber("Fighter meter", fighter.meter, 0, 300);
+  validateNumber("Fighter damageTaken", fighter.damageTaken, 0, 100);
 }
 
 function validateMatch(match: Pick<Match, "phase" | "round" | "winner" | "phaseTicks">): void {
@@ -250,11 +267,18 @@ export class DebugHarness {
     return this.snapshot();
   }
 
+  /** Select a complete match pair through Match's public validation boundary. */
+  selectPlayer(playerId: FighterId, opponentId: FighterId): DebugMatchSnapshot {
+    this.match.selectPlayer(playerId, opponentId);
+    return this.snapshot();
+  }
+
   forceFighter(index: 0 | 1, patch: DebugFighterPatch): DebugMatchSnapshot {
     if (!validFighterIndex(index)) {
       throw new Error("Fighter index must be 0 or 1");
     }
     const fighter = this.match.fighters[index];
+    validateAllowedKeys(patch, FIGHTER_FIELDS, "fighter");
     const candidate: Fighter = { ...fighter, ...patch };
     validateFighter(candidate);
     Object.assign(fighter, candidate);
@@ -283,6 +307,7 @@ export class DebugHarness {
     ]);
     const snapshot = {
       fighters,
+      effects: Object.freeze(this.match.effects.map(copyEffect)),
       phase: this.match.phase,
       round: this.match.round,
       winner: this.match.winner,

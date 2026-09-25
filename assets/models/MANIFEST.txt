@@ -1,0 +1,4 @@
+assets/models/mesh2motion_doctor_m.glb
+assets/models/mesh2motion_female_31.glb
+assets/models/mesh2motion_female_9.glb
+assets/models/mesh2motion_mcclintock.glb

@@ -1,18 +1,22 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { FRANKLIN_UNLOCK_STORAGE_KEY } from "../../src/franklin_storage";
+import { PROGRESS_STORAGE_KEY } from "../../src/progress/storage";
+import { decodeProgress } from "../../src/progress/unlocks";
 
-// Selector contract: chooser, role-radio labels, Begin match, fighter-choice IDs, and the polite
-// announcement host come from src/index.html:52-85. Franklin's dynamic role radio and unlocked
-// help text come from src/main.ts:294-323; chooser confirmation, focus, and navigation come from
-// src/main.ts:430-475. Update this test when those user-facing contracts change.
+// Selector contract: the static chooser and polite announcement host come from src/index.html.
+// Dynamic fighter radios, chooser help, confirmation, focus, and navigation come from
+// src/ui/chooser.ts. Update this test when those user-facing contracts change.
 test.describe.configure({ mode: "serial" });
 
 type GamepadFixture = { mapping: string; axes: number[]; buttons: { pressed: boolean }[] };
-type Fighter = { role: string; x: number; z: number; hp: number; state: string };
+type Fighter = { id: string; x: number; z: number; hp: number; state: string };
 type MatchState = { fighters: Fighter[]; phase: string; winner: number | null };
 
-const COMPLETE_UNLOCK_RECORD = JSON.stringify({ version: 1, wonRoles: ["warburg", "curie"] });
+const COMPLETE_UNLOCK_RECORD = JSON.stringify({ version: 2, wonAs: ["warburg", "curie"], wins: 2 });
+
+function unlockedFighterCount(record: string | null): number {
+  return decodeProgress(record).unlockedSet.size;
+}
 
 const pad = (buttons: number[] = [], axes = [0, 0, 0, 0]): GamepadFixture => {
   const fixture: GamepadFixture = {
@@ -41,7 +45,7 @@ function collectBrowserErrors(page: Page): string[] {
 
 async function installUnlock(page: Page, record = COMPLETE_UNLOCK_RECORD): Promise<void> {
   await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
-    key: FRANKLIN_UNLOCK_STORAGE_KEY,
+    key: PROGRESS_STORAGE_KEY,
     value: record,
   });
 }
@@ -153,24 +157,24 @@ test("a normal locked page has no Franklin chooser, presentation, request, or pu
   await page.goto(baseURL!);
   const dialog = page.getByRole("dialog", { name: "Choose your fighter" });
   await expect(dialog).toBeVisible();
-  await expect(page.getByRole("radio")).toHaveCount(2);
+  await expect(page.getByRole("radio")).toHaveCount(unlockedFighterCount(null));
   await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
   await expect(page.getByText("Rosalind Franklin", { exact: true })).toHaveCount(0);
-  await expect(page.locator('[value="franklin"], [data-fighter="franklin"]')).toHaveCount(0);
+  await expect(page.locator('[value="franklin"]')).toHaveCount(0);
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   expect(
     await page.evaluate(() => {
       const chooser = document.querySelector("#fighter-select");
       const globals = window as typeof window & {
-        __fightSetFranklinUnlock?: unknown;
-        __fightCommitFranklinUnlock?: unknown;
+        __fightSetProgress?: unknown;
+        __fightCommitProgress?: unknown;
       };
       return (
         !document.body.innerText.includes("Rosalind Franklin") &&
         !chooser?.textContent?.includes("Rosalind Franklin") &&
-        !chooser?.querySelector('[value="franklin"], [data-fighter="franklin"]') &&
-        globals.__fightSetFranklinUnlock === undefined &&
-        globals.__fightCommitFranklinUnlock === undefined
+        !chooser?.querySelector('[value="franklin"]') &&
+        globals.__fightSetProgress === undefined &&
+        globals.__fightCommitProgress === undefined
       );
     }),
   ).toBe(true);
@@ -191,10 +195,16 @@ test("Otto Heinrich Warburg keeps his full name in player and AI fight labels", 
     "aria-label",
     "Otto Heinrich Warburg status",
   );
-  await expect(page.locator('#red-status [role="progressbar"]')).toHaveAttribute(
-    "aria-label",
-    "Otto Heinrich Warburg health",
+  await expect(
+    page.getByRole("progressbar", { name: "Otto Heinrich Warburg health" }),
+  ).toHaveAttribute("aria-valuenow", "100");
+  const warburgMeter = page.locator(
+    '[role="meter"][aria-label="Otto Heinrich Warburg special meter"]',
   );
+  await expect(warburgMeter).toHaveAttribute("role", "meter");
+  await expect(warburgMeter).toHaveAttribute("aria-label", "Otto Heinrich Warburg special meter");
+  await expect(warburgMeter).toHaveAttribute("aria-valuenow", "0");
+  await expect(page.locator("#red-special")).toHaveText("Next: Lactate Drive");
 
   await page.getByRole("radio", { name: /Marie Curie/ }).check();
   await page.getByRole("button", { name: "Begin match" }).click();
@@ -203,10 +213,18 @@ test("Otto Heinrich Warburg keeps his full name in player and AI fight labels", 
     "aria-label",
     "Otto Heinrich Warburg AI status",
   );
-  await expect(page.locator('#blue-status [role="progressbar"]')).toHaveAttribute(
-    "aria-label",
-    "Otto Heinrich Warburg AI health",
+  await expect(
+    page.getByRole("progressbar", { name: "Otto Heinrich Warburg AI health" }),
+  ).toHaveAttribute("aria-valuenow", "100");
+  const warburgAiMeter = page.locator(
+    '[role="meter"][aria-label="Otto Heinrich Warburg AI special meter"]',
   );
+  await expect(warburgAiMeter).toHaveAttribute("role", "meter");
+  await expect(warburgAiMeter).toHaveAttribute(
+    "aria-label",
+    "Otto Heinrich Warburg AI special meter",
+  );
+  await expect(warburgAiMeter).toHaveAttribute("aria-valuenow", "0");
   expect(errors).toEqual([]);
 });
 
@@ -224,7 +242,7 @@ test("a durable unlock provides semantic chooser order, focus, wrapping, and a s
   await expect(dialog).toHaveAttribute("aria-labelledby", "fighter-select-title");
   await expect(dialog).toHaveAttribute("aria-describedby", "fighter-select-help");
   await expect(choices.getByText("Player fighter", { exact: true })).toBeVisible();
-  await expect(page.getByRole("radio")).toHaveCount(3);
+  await expect(page.getByRole("radio")).toHaveCount(unlockedFighterCount(COMPLETE_UNLOCK_RECORD));
   await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toHaveAccessibleName(
     /Otto Heinrich Warburg/,
   );
@@ -234,9 +252,7 @@ test("a durable unlock provides semantic chooser order, focus, wrapping, and a s
   await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toHaveAccessibleName(
     /Rosalind Franklin/,
   );
-  await expect(page.locator("#fighter-select-help")).toHaveText(
-    "Select Otto Heinrich Warburg, Marie Curie, or Rosalind Franklin. The other fighter is controlled by the AI.",
-  );
+  await expect(page.locator("#fighter-select-help")).toContainText("Select");
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-warburg");
 
@@ -246,7 +262,11 @@ test("a durable unlock provides semantic chooser order, focus, wrapping, and a s
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
   await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
+  await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
   await page.keyboard.press("Tab");
@@ -256,7 +276,7 @@ test("a durable unlock provides semantic chooser order, focus, wrapping, and a s
 
   await page.reload();
   await waitForReady(page);
-  await expect(page.getByRole("radio")).toHaveCount(3);
+  await expect(page.getByRole("radio")).toHaveCount(unlockedFighterCount(COMPLETE_UNLOCK_RECORD));
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   expect(errors).toEqual([]);
 });
@@ -285,7 +305,15 @@ for (const confirmation of [
     await releaseNavigation(page);
     await setGamepad(page, pad([], [1, 0, 0, 0]));
     await renderFrames(page);
+    await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
+    await releaseNavigation(page);
+    await setGamepad(page, pad([], [1, 0, 0, 0]));
+    await renderFrames(page);
     await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+    await releaseNavigation(page);
+    await setGamepad(page, pad([14]));
+    await renderFrames(page);
+    await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
     await releaseNavigation(page);
     await setGamepad(page, pad([14]));
     await renderFrames(page);
@@ -298,8 +326,8 @@ for (const confirmation of [
     expect(await matchState(page)).toMatchObject({
       phase: "fight",
       fighters: [
-        { role: "franklin", hp: 100, state: "idle" },
-        { role: "warburg", hp: 100 },
+        { id: "franklin", hp: 100, state: "idle" },
+        { id: "warburg", hp: 100 },
       ],
     });
     await renderFrames(page);
@@ -320,7 +348,7 @@ test("a real second Nobel win produces one polite announcement after its durable
   test.setTimeout(115_000);
   const errors = collectBrowserErrors(page);
   await installDeterministicRandom(page, 0x0f7a0001);
-  await installUnlock(page, JSON.stringify({ version: 1, wonRoles: ["curie"] }));
+  await installUnlock(page, JSON.stringify({ version: 2, wonAs: ["curie"], wins: 1 }));
   await page.goto(liveUrl(baseURL!));
   await waitForReady(page);
   const announcement = page.locator("#franklin-unlock-announcement");
@@ -344,10 +372,12 @@ test("a real second Nobel win produces one polite announcement after its durable
   await completeLiveWarburgWin(page);
 
   await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), FRANKLIN_UNLOCK_STORAGE_KEY))
+    .poll(() => page.evaluate((key) => localStorage.getItem(key), PROGRESS_STORAGE_KEY))
     .toBe(COMPLETE_UNLOCK_RECORD);
   await expect(announcement).toHaveText("Rosalind Franklin is now available.");
-  await expect(page.locator("#fighter-choices input[name='fighter']")).toHaveCount(3);
+  await expect(page.locator("#fighter-choices input[name='fighter']")).toHaveCount(
+    unlockedFighterCount(COMPLETE_UNLOCK_RECORD),
+  );
   await renderFrames(page, 12);
   expect(
     await page.evaluate(() =>

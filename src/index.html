@@ -22,6 +22,22 @@
           >
             <div id="red-health"></div>
           </div>
+          <span id="red-special" class="special-name">Next: Special</span>
+          <div id="red-special-banner" class="special-banner" aria-hidden="true" hidden>
+            <strong id="red-special-banner-name"></strong>
+            <span id="red-special-banner-caption"></span>
+          </div>
+          <div
+            class="special-meter"
+            role="meter"
+            aria-label="Otto Heinrich Warburg special meter"
+            aria-valuemin="0"
+            aria-valuemax="300"
+            aria-valuenow="0"
+          >
+            <div id="red-meter"></div>
+            <span class="meter-segments" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
           <span id="red-wins">Wins 0</span>
         </section>
         <div id="status" role="status" aria-live="polite">ROUND 1</div>
@@ -37,18 +53,37 @@
           >
             <div id="blue-health"></div>
           </div>
+          <span id="blue-special" class="special-name">Next: Special</span>
+          <div id="blue-special-banner" class="special-banner" aria-hidden="true" hidden>
+            <strong id="blue-special-banner-name"></strong>
+            <span id="blue-special-banner-caption"></span>
+          </div>
+          <div
+            class="special-meter"
+            role="meter"
+            aria-label="Marie Curie AI special meter"
+            aria-valuemin="0"
+            aria-valuemax="300"
+            aria-valuenow="0"
+          >
+            <div id="blue-meter"></div>
+            <span class="meter-segments" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
           <span id="blue-wins">Wins 0</span>
         </section>
       </div>
-      <div id="move-indicator" class="move-indicator" hidden>
-        <span id="move-name"></span>
-        <span class="move-meter" aria-hidden="true"><span id="move-meter-fill"></span></span>
-      </div>
-      <div id="curie-indicator" class="curie-indicator" aria-label="Curie research cue" hidden>
-        <strong>SEPARATION STEP</strong>
-        <span>FRACTION / ACTIVITY</span>
-        <span class="curie-meter" aria-hidden="true"><span id="curie-meter-fill"></span></span>
-      </div>
+      <section id="super-card" class="super-card" aria-hidden="true" hidden>
+        <span id="super-card-fighter"></span>
+        <strong id="super-card-special"></strong>
+        <span id="super-card-caption"></span>
+      </section>
+      <div
+        id="super-card-announcement"
+        class="visually-hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></div>
       <div
         id="franklin-unlock-announcement"
         class="visually-hidden"
@@ -63,28 +98,15 @@
         aria-describedby="fighter-select-help"
       >
         <h1 id="fighter-select-title">Choose your fighter</h1>
-        <p id="fighter-select-help">
-          Select Otto Heinrich Warburg or Marie Curie. The other fighter is controlled by the AI.
-        </p>
+        <p id="fighter-select-help">Select a fighter. The other fighter is controlled by the AI.</p>
         <fieldset id="fighter-choices">
           <legend>Player fighter</legend>
-          <label class="fighter-choice" for="select-warburg">
-            <input id="select-warburg" name="fighter" type="radio" value="warburg" checked />
-            <span
-              ><strong>Otto Heinrich Warburg</strong
-              ><small>Oxygen Transfer and metabolic pressure</small></span
-            >
-          </label>
-          <label class="fighter-choice" for="select-curie">
-            <input id="select-curie" name="fighter" type="radio" value="curie" />
-            <span
-              ><strong>Marie Curie</strong><small>Separation Step and measured timing</small></span
-            >
-          </label>
         </fieldset>
+        <section id="fighter-detail" class="fighter-detail" aria-live="polite"></section>
         <button id="start-match" class="start-match" type="button">Begin match</button>
         <p class="selection-controls">
-          Left/right or A/D selects. Enter, Space, gamepad south, or Start begins.
+          Arrow keys, WASD, or the D-pad select. I or gamepad north focuses the Nobel link. Enter,
+          Space, gamepad south, or Start begins a card selection or opens the focused link.
         </p>
       </dialog>
       <aside class="help" aria-label="Controls">
@@ -94,6 +116,9 @@
       </aside>
       <button id="change-fighter" class="change-fighter" type="button" hidden>
         Change fighter
+      </button>
+      <button id="retry-model-load" class="retry-model-load" type="button" hidden>
+        Retry fighter load
       </button>
       <button id="restart" type="button">Restart match</button>
     </main>

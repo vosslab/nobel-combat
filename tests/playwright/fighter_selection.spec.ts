@@ -1,18 +1,18 @@
+// Selector contract: dialog controls: src/index.html:94-110; cards/radios: src/ui/chooser.ts:267-346.
+// Progress hooks: src/main.ts:366-369; debug snapshots: src/playtest_probe.ts:59-80.
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { FRANKLIN_UNLOCK_STORAGE_KEY } from "../../src/franklin_storage";
-
+import { PROGRESS_STORAGE_KEY } from "../../src/progress/storage";
+import { decodeProgress } from "../../src/progress/unlocks";
 test.describe.configure({ mode: "serial" });
-
 type SyntheticGamepad = {
   mapping: string;
   axes: number[];
   buttons: { pressed: boolean }[];
 };
-
 type FightSnapshot = {
   fighters: {
-    role: string;
+    id: string;
     x: number;
     z: number;
     hp: number;
@@ -24,15 +24,25 @@ type FightSnapshot = {
   round: number;
   input: { action: { light: boolean } };
 };
-
 type KeyboardAction = {
   x: number;
   z: number;
   light: boolean;
   heavy: boolean;
   block: boolean;
+  special: boolean;
 };
-
+const FRANKLIN_UNLOCKED_RECORD = '{"version":2,"wonAs":["warburg","curie"],"wins":2}';
+function unlockedFighterCount(record: string | null): number {
+  return decodeProgress(record).unlockedSet.size;
+}
+async function expectUnlockedFighterCount(page: Page, record: string | null): Promise<void> {
+  await expect(page.getByRole("radio")).toHaveCount(unlockedFighterCount(record));
+}
+async function openFighterChooser(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Change fighter" }).click();
+  await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeVisible();
+}
 const pad = (axes: number[] = [0, 0, 0, 0], pressedButtons: number[] = []): SyntheticGamepad => {
   const gamepad: SyntheticGamepad = {
     mapping: "standard",
@@ -42,13 +52,11 @@ const pad = (axes: number[] = [0, 0, 0, 0], pressedButtons: number[] = []): Synt
   for (const button of pressedButtons) gamepad.buttons[button] = { pressed: true };
   return gamepad;
 };
-
 function liveUrl(baseURL: string): string {
   const url = new URL(baseURL);
   url.searchParams.set("playtest", "1");
   return url.toString();
 }
-
 async function installDeterministicRandom(page: Page, seed = 0x5eedc0de): Promise<void> {
   await page.addInitScript((initialSeed) => {
     let state = initialSeed >>> 0;
@@ -61,7 +69,6 @@ async function installDeterministicRandom(page: Page, seed = 0x5eedc0de): Promis
     });
   }, seed);
 }
-
 async function installGamepadMock(page: Page): Promise<void> {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "getGamepads", {
@@ -74,14 +81,12 @@ async function installGamepadMock(page: Page): Promise<void> {
     });
   });
 }
-
 async function setGamepad(page: Page, gamepad: SyntheticGamepad | null): Promise<void> {
   await page.evaluate((value) => {
     if (value === null) delete document.documentElement.dataset.selectionGamepad;
     else document.documentElement.dataset.selectionGamepad = JSON.stringify(value);
   }, gamepad);
 }
-
 async function snapshot(page: Page): Promise<FightSnapshot> {
   return page.evaluate(() => {
     const snapshot = (
@@ -91,7 +96,6 @@ async function snapshot(page: Page): Promise<FightSnapshot> {
     return snapshot;
   });
 }
-
 async function waitForReady(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const snapshot = (
@@ -102,7 +106,6 @@ async function waitForReady(page: Page): Promise<void> {
     return snapshot?.rigs?.length === 2;
   });
 }
-
 async function renderFrames(page: Page, count = 6): Promise<void> {
   await page.evaluate(
     (frames) =>
@@ -118,7 +121,6 @@ async function renderFrames(page: Page, count = 6): Promise<void> {
     count,
   );
 }
-
 async function setKeyboardAction(
   page: Page,
   action: KeyboardAction,
@@ -132,6 +134,7 @@ async function setKeyboardAction(
     KeyJ: action.light,
     KeyK: action.heavy,
     KeyL: action.block,
+    KeyI: action.special,
   };
   for (const [key, pressed] of Object.entries(keys)) {
     if (pressed && !heldKeys.has(key)) {
@@ -143,7 +146,6 @@ async function setKeyboardAction(
     }
   }
 }
-
 async function completeLivePlayerWin(page: Page): Promise<void> {
   const heldKeys = new Set<string>();
   await page.getByRole("button", { name: "Begin match" }).click();
@@ -154,8 +156,15 @@ async function completeLivePlayerWin(page: Page): Promise<void> {
     const [player, opponent] = state.fighters;
     if (!player || !opponent) throw new Error("Live match did not expose both fighters.");
     const distance = Math.hypot(player.x - opponent.x, player.z - opponent.z);
-    const heavyReach = player.role === "warburg" ? 2.4 : 2.15;
-    const action: KeyboardAction = { x: 0, z: 0, light: false, heavy: false, block: false };
+    const heavyReach = player.id === "warburg" ? 2.4 : 2.15;
+    const action: KeyboardAction = {
+      x: 0,
+      z: 0,
+      light: false,
+      heavy: false,
+      block: false,
+      special: false,
+    };
     if (state.phase === "fight") {
       const canAct = ["idle", "move", "block"].includes(player.state);
       const shouldBlock = (opponent.state === "light" || opponent.state === "heavy") && canAct;
@@ -171,71 +180,43 @@ async function completeLivePlayerWin(page: Page): Promise<void> {
     await setKeyboardAction(page, action, heldKeys);
     await page.waitForTimeout(70);
   }
-  await setKeyboardAction(page, { x: 0, z: 0, light: false, heavy: false, block: false }, heldKeys);
+  await setKeyboardAction(
+    page,
+    { x: 0, z: 0, light: false, heavy: false, block: false, special: false },
+    heldKeys,
+  );
   const result = await snapshot(page);
   expect(result).toMatchObject({ phase: "matchOver", winner: 0 });
 }
-
-async function selectAndCompleteLivePlayerWin(
-  page: Page,
-  role: "warburg" | "curie",
-): Promise<void> {
-  const name = role === "warburg" ? /Otto Heinrich Warburg/ : /Marie Curie/;
+async function selectAndCompleteLivePlayerWin(page: Page, id: "warburg" | "curie"): Promise<void> {
+  const name = id === "warburg" ? /Otto Heinrich Warburg/ : /Marie Curie/;
   await page.getByRole("radio", { name }).check();
   await completeLivePlayerWin(page);
 }
-
-async function storedFranklinRecord(page: Page): Promise<string | null> {
-  return page.evaluate((key) => localStorage.getItem(key), FRANKLIN_UNLOCK_STORAGE_KEY);
+async function storedProgressRecord(page: Page): Promise<string | null> {
+  return page.evaluate((key) => localStorage.getItem(key), PROGRESS_STORAGE_KEY);
 }
-
-async function injectFranklinUnlock(page: Page): Promise<void> {
+async function injectProgress(page: Page): Promise<void> {
   await page.evaluate(() => {
     const probe = window as typeof window & {
-      __fightSetFranklinUnlock?: (value: unknown) => void;
+      __fightSetProgress?: (value: unknown) => void;
     };
-    if (!probe.__fightSetFranklinUnlock) throw new Error("Franklin unlock probe was unavailable.");
-    probe.__fightSetFranklinUnlock({ version: 1, wonRoles: ["warburg", "curie"] });
+    if (!probe.__fightSetProgress) throw new Error("Progress probe was unavailable.");
+    probe.__fightSetProgress({ version: 2, wonAs: ["warburg", "curie"], wins: 2 });
   });
 }
-
-async function commitFranklinUnlock(page: Page, value: unknown): Promise<void> {
+async function commitProgress(page: Page, value: unknown): Promise<void> {
   await page.evaluate((committedValue) => {
     const probe = window as typeof window & {
-      __fightCommitFranklinUnlock?: (value: unknown) => void;
+      __fightCommitProgress?: (value: unknown) => void;
     };
-    if (!probe.__fightCommitFranklinUnlock) {
-      throw new Error("Franklin unlock commit probe was unavailable.");
+    if (!probe.__fightCommitProgress) {
+      throw new Error("Progress commit probe was unavailable.");
     }
-    probe.__fightCommitFranklinUnlock(committedValue);
+    probe.__fightCommitProgress(committedValue);
   }, value);
 }
-
-test("Franklin chooser injection is unavailable outside local playtest mode", async ({
-  page,
-  baseURL,
-}) => {
-  await page.goto(baseURL!);
-  expect(
-    await page.evaluate(
-      () =>
-        (
-          window as typeof window & {
-            __fightSetFranklinUnlock?: unknown;
-            __fightCommitFranklinUnlock?: unknown;
-          }
-        ).__fightSetFranklinUnlock === undefined &&
-        (
-          window as typeof window & {
-            __fightCommitFranklinUnlock?: unknown;
-          }
-        ).__fightCommitFranklinUnlock === undefined,
-    ),
-  ).toBe(true);
-  await expect(page.locator('[value="franklin"], [data-fighter="franklin"]')).toHaveCount(0);
-});
-
-test("denied startup storage fails closed while the two-role match remains playable", async ({
+test("denied startup storage fails closed while the starter roster remains playable", async ({
   page,
   baseURL,
 }) => {
@@ -251,18 +232,16 @@ test("denied startup storage fails closed while the two-role match remains playa
   });
   await page.goto(liveUrl(baseURL!));
   await waitForReady(page);
-
-  await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+  await expectUnlockedFighterCount(page, null);
   await expect(page.getByText("Rosalind Franklin", { exact: true })).toHaveCount(0);
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   await page.getByRole("button", { name: "Begin match" }).click();
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
   await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
     .toEqual(["warburg", "curie"]);
   expect(errors).toEqual([]);
 });
-
 test("a post-startup storage write stays presentation-silent until F6B consumes it", async ({
   page,
   baseURL,
@@ -274,19 +253,16 @@ test("a post-startup storage write stays presentation-silent until F6B consumes 
   });
   await page.goto(liveUrl(baseURL!));
   await waitForReady(page);
-
-  await expect(page.getByRole("radio")).toHaveCount(2);
+  await expectUnlockedFighterCount(page, null);
   await page.evaluate((key) => {
-    localStorage.setItem(key, JSON.stringify({ version: 1, wonRoles: ["warburg", "curie"] }));
-  }, FRANKLIN_UNLOCK_STORAGE_KEY);
+    localStorage.setItem(key, JSON.stringify({ version: 2, wonAs: ["warburg", "curie"], wins: 2 }));
+  }, PROGRESS_STORAGE_KEY);
   await renderFrames(page);
-
-  await expect(page.getByRole("radio")).toHaveCount(2);
+  await expectUnlockedFighterCount(page, null);
   await expect(page.getByText("Rosalind Franklin", { exact: true })).toHaveCount(0);
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   expect(errors).toEqual([]);
 });
-
 test("debug forced match-over remains a fixture and cannot progress Franklin", async ({
   page,
   baseURL,
@@ -306,12 +282,11 @@ test("debug forced match-over remains a fixture and cannot progress Franklin", a
       }
       originalSetItem.call(this, key, value);
     };
-  }, FRANKLIN_UNLOCK_STORAGE_KEY);
+  }, PROGRESS_STORAGE_KEY);
   const url = new URL(baseURL!);
   url.searchParams.set("debug", "1");
   await page.goto(url.toString());
   await waitForReady(page);
-
   await page.evaluate(() => {
     const debug = (
       window as typeof window & {
@@ -323,7 +298,8 @@ test("debug forced match-over remains a fixture and cannot progress Franklin", a
   });
   await renderFrames(page);
 
-  await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+  await openFighterChooser(page);
+  await expectUnlockedFighterCount(page, null);
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   expect(await page.evaluate(() => document.documentElement.dataset.franklinWrites ?? "0")).toBe(
     "0",
@@ -343,17 +319,18 @@ test("a live Warburg victory durably unlocks Franklin after a stored Curie victo
   });
   await installDeterministicRandom(page);
   await page.addInitScript((storageKey) => {
-    localStorage.setItem(storageKey, JSON.stringify({ version: 1, wonRoles: ["curie"] }));
-  }, FRANKLIN_UNLOCK_STORAGE_KEY);
+    localStorage.setItem(storageKey, JSON.stringify({ version: 2, wonAs: ["curie"], wins: 1 }));
+  }, PROGRESS_STORAGE_KEY);
   await page.goto(liveUrl(baseURL!));
   await waitForReady(page);
-  await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+  await expectUnlockedFighterCount(page, '{"version":2,"wonAs":["curie"],"wins":1}');
   await completeLivePlayerWin(page);
 
   await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), FRANKLIN_UNLOCK_STORAGE_KEY))
-    .toBe('{"version":1,"wonRoles":["warburg","curie"]}');
-  await expect(page.locator('input[name="fighter"]')).toHaveCount(3);
+    .poll(() => page.evaluate((key) => localStorage.getItem(key), PROGRESS_STORAGE_KEY))
+    .toBe('{"version":2,"wonAs":["warburg","curie"],"wins":2}');
+  await openFighterChooser(page);
+  await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
   await expect(page.locator("#franklin-unlock-announcement")).toHaveText(
     "Rosalind Franklin is now available.",
   );
@@ -380,26 +357,26 @@ for (const roles of [
 
     await selectAndCompleteLivePlayerWin(page, roles[0]);
     await expect
-      .poll(() => storedFranklinRecord(page))
-      .toBe(`{"version":1,"wonRoles":["${roles[0]}"]}`);
-    await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+      .poll(() => storedProgressRecord(page))
+      .toBe(`{"version":2,"wonAs":["${roles[0]}"],"wins":1}`);
+    await openFighterChooser(page);
+    await expectUnlockedFighterCount(page, `{"version":2,"wonAs":["${roles[0]}"],"wins":1}`);
     await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
 
-    await page.getByRole("button", { name: "Change fighter" }).click();
-    await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeVisible();
     await selectAndCompleteLivePlayerWin(page, roles[1]);
 
     await expect
-      .poll(() => storedFranklinRecord(page))
-      .toBe('{"version":1,"wonRoles":["warburg","curie"]}');
-    await expect(page.locator('input[name="fighter"]')).toHaveCount(3);
+      .poll(() => storedProgressRecord(page))
+      .toBe('{"version":2,"wonAs":["warburg","curie"],"wins":2}');
+    await openFighterChooser(page);
+    await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
     await expect(page.locator("#franklin-unlock-announcement")).toHaveText(
       "Rosalind Franklin is now available.",
     );
 
     await page.reload();
     await waitForReady(page);
-    await expect(page.getByRole("radio")).toHaveCount(3);
+    await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
     await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeVisible();
     await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
     expect(errors).toEqual([]);
@@ -418,23 +395,24 @@ test("a denied durable write preserves a valid partial record and keeps Franklin
   });
   await installDeterministicRandom(page);
   await page.addInitScript((storageKey) => {
-    localStorage.setItem(storageKey, '{"version":1,"wonRoles":["curie"]}');
+    localStorage.setItem(storageKey, '{"version":2,"wonAs":["curie"],"wins":1}');
     Storage.prototype.setItem = function (key): never {
       if (key === storageKey) throw new Error("Franklin storage write denied");
       throw new Error("unexpected storage write");
     };
-  }, FRANKLIN_UNLOCK_STORAGE_KEY);
+  }, PROGRESS_STORAGE_KEY);
   await page.goto(liveUrl(baseURL!));
   await waitForReady(page);
 
-  await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+  await expectUnlockedFighterCount(page, '{"version":2,"wonAs":["curie"],"wins":1}');
   await completeLivePlayerWin(page);
 
-  await expect.poll(() => storedFranklinRecord(page)).toBe('{"version":1,"wonRoles":["curie"]}');
-  await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+  await expect
+    .poll(() => storedProgressRecord(page))
+    .toBe('{"version":2,"wonAs":["curie"],"wins":1}');
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
-  await page.getByRole("button", { name: "Change fighter" }).click();
-  await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeVisible();
+  await openFighterChooser(page);
+  await expectUnlockedFighterCount(page, '{"version":2,"wonAs":["curie"],"wins":1}');
   expect(errors).toEqual([]);
 });
 
@@ -458,11 +436,19 @@ test("chooser pauses the live simulation, defaults accessibly, and confirms Curi
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Tab");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.textContent))
+    .toBe("Read about Otto Heinrich Warburg");
+  await page.keyboard.press("Tab");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("start-match");
   await page.keyboard.press("Tab");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-warburg");
   await page.keyboard.press("Shift+Tab");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("start-match");
+  await page.keyboard.press("Shift+Tab");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.textContent))
+    .toBe("Read about Otto Heinrich Warburg");
   await page.keyboard.press("Shift+Tab");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-warburg");
   await page.locator("#restart").focus();
@@ -493,18 +479,22 @@ test("chooser pauses the live simulation, defaults accessibly, and confirms Curi
   await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
   await page.keyboard.up("ArrowRight");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-curie");
-  await expect(page.locator("#player-move-help")).toContainText("Separation Step");
-  await expect(page.locator("#player-move-help")).not.toContainText("Oxygen Transfer");
+  await expect(page.locator("#player-move-help")).toHaveText(
+    "WASD move \u00b7 J light \u00b7 K heavy knockdown \u00b7 L block \u00b7 I Special \u00b7 R restart",
+  );
+  await expect(page.locator("#gamepad-move-help")).toHaveText(
+    "Gamepad: left stick/D-pad move \u00b7 right stick view \u00b7 south light \u00b7 east heavy knockdown \u00b7 north Special (button 3) \u00b7 right shoulder block \u00b7 Start restart",
+  );
 
   await page.keyboard.down("Enter");
   await renderFrames(page);
   await expect(dialog).toBeHidden();
   await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
     .toEqual(["curie", "warburg"]);
   await renderFrames(page);
   await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
     .toEqual(["curie", "warburg"]);
   await page.keyboard.up("Enter");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("game");
@@ -533,9 +523,9 @@ test("validated local unlock adds and navigates the Franklin choice after denied
   await waitForReady(page);
 
   const dialog = page.getByRole("dialog", { name: "Choose your fighter" });
-  await expect(page.getByRole("radio")).toHaveCount(2);
+  await expectUnlockedFighterCount(page, null);
   await expect(page.getByText("Rosalind Franklin", { exact: true })).toHaveCount(0);
-  await expect(page.locator('[value="franklin"], [data-fighter="franklin"]')).toHaveCount(0);
+  await expect(page.locator('[value="franklin"]')).toHaveCount(0);
   expect(
     await page.evaluate(() =>
       performance
@@ -546,86 +536,127 @@ test("validated local unlock adds and navigates the Franklin choice after denied
 
   await page.evaluate(() => {
     const probe = window as typeof window & {
-      __fightSetFranklinUnlock?: (value: unknown) => void;
+      __fightSetProgress?: (value: unknown) => void;
     };
-    probe.__fightSetFranklinUnlock?.({ version: 1, wonRoles: ["franklin"] });
+    probe.__fightSetProgress?.({ version: 2, wonAs: ["franklin"], wins: 1 });
   });
-  await expect(page.getByRole("radio")).toHaveCount(2);
-  await injectFranklinUnlock(page);
-  await expect(page.getByRole("radio")).toHaveCount(3);
+  await expectUnlockedFighterCount(page, null);
+  await injectProgress(page);
+  await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
   expect(
     await page
       .getByRole("radio")
       .evaluateAll((radios) => radios.map((radio) => (radio as HTMLInputElement).value)),
-  ).toEqual(["warburg", "curie", "franklin"]);
+  ).toEqual([...decodeProgress(FRANKLIN_UNLOCKED_RECORD).unlockedSet]);
   await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  const unlockedIds = [...decodeProgress(FRANKLIN_UNLOCKED_RECORD).unlockedSet];
+  let selectedIndex = unlockedIds.indexOf("warburg");
+  const expectSelectedIndex = async (): Promise<void> => {
+    await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(
+      unlockedIds[selectedIndex]!,
+    );
+  };
 
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
+  await page.keyboard.press("ArrowLeft");
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-franklin");
   await expect(page.locator("#player-move-help")).toHaveText(
-    "WASD move · J light · K heavy knockdown · L block · R restart",
+    "WASD move \u00b7 J light \u00b7 K heavy knockdown \u00b7 L block \u00b7 I Special \u00b7 R restart",
   );
   await expect(page.locator("#gamepad-move-help")).toHaveText(
-    "Gamepad: left stick/D-pad move · right stick view · south light · east heavy knockdown · right shoulder block · Start restart",
+    "Gamepad: left stick/D-pad move \u00b7 right stick view \u00b7 south light \u00b7 east heavy knockdown \u00b7 north Special (button 3) \u00b7 right shoulder block \u00b7 Start restart",
   );
   await expect(page.locator("#player-move-help")).not.toContainText("Separation Step");
   await expect(page.locator("#gamepad-move-help")).not.toContainText("Separation Step");
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
+  await page.keyboard.press("ArrowRight");
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
 
   await setGamepad(page, pad([-1, 0, 0, 0]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad([-1, 0, 0, 0]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad([-1, 0, 0, 0]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad([1, 0, 0, 0]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad(undefined, [14]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad(undefined, [14]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad(undefined, [15]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad(undefined, [15]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
   await setGamepad(page, pad(undefined, [14]));
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
+  await expectSelectedIndex();
   await setGamepad(page, null);
   await renderFrames(page);
-
+  await setGamepad(page, pad(undefined, [15]));
+  await renderFrames(page);
+  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+  await expectSelectedIndex();
+  await setGamepad(page, null);
+  await renderFrames(page);
+  const franklinIndex = unlockedIds.indexOf("franklin");
+  for (let moves = 0; selectedIndex !== franklinIndex && moves < unlockedIds.length; moves++) {
+    await setGamepad(page, pad(undefined, [15]));
+    await renderFrames(page);
+    selectedIndex = (selectedIndex + 1) % unlockedIds.length;
+    await expectSelectedIndex();
+    await setGamepad(page, null);
+    await renderFrames(page);
+  }
+  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue("franklin");
   const before = await snapshot(page);
   await renderFrames(page);
   const paused = await snapshot(page);
@@ -635,7 +666,7 @@ test("validated local unlock adds and navigates the Franklin choice after denied
   await renderFrames(page);
   await expect(dialog).toBeHidden();
   await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
     .toEqual(["franklin", "warburg"]);
   expect((await snapshot(page)).fighters[0]).toMatchObject({ state: "idle", attackHeld: false });
   await renderFrames(page);
@@ -686,7 +717,7 @@ test("synthetic standard gamepad selects and confirms the same complementary pai
   await renderFrames(page);
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
   await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
     .toEqual(["curie", "warburg"]);
   expect((await snapshot(page)).fighters[0]).toMatchObject({ state: "idle", attackHeld: false });
   await setGamepad(page, null);
@@ -716,8 +747,8 @@ test("held Start confirms once without applying an immediate restart", async ({
     phase: "fight",
     round: 1,
     fighters: [
-      { role: "warburg", hp: 100, wins: 0, state: "idle", attackHeld: false },
-      { role: "curie", hp: 100, wins: 0 },
+      { id: "warburg", hp: 100, wins: 0, state: "idle", attackHeld: false },
+      { id: "curie", hp: 100, wins: 0 },
     ],
   });
   await renderFrames(page);
@@ -726,8 +757,8 @@ test("held Start confirms once without applying an immediate restart", async ({
     phase: "fight",
     round: 1,
     fighters: [
-      { role: "warburg", wins: 0 },
-      { role: "curie", wins: 0 },
+      { id: "warburg", wins: 0 },
+      { id: "curie", wins: 0 },
     ],
   });
   expect(afterHeldStart.fighters[1]?.x).toBeLessThan(1.8);
@@ -749,7 +780,7 @@ test("a post-commit Franklin unlock announces once while an injected unlock stay
 
   const announcement = page.locator("#franklin-unlock-announcement");
   await expect(announcement).toBeEmpty();
-  await injectFranklinUnlock(page);
+  await injectProgress(page);
   await expect(announcement).toBeEmpty();
   await page.evaluate(() => {
     const target = document.querySelector("#franklin-unlock-announcement");
@@ -761,17 +792,17 @@ test("a post-commit Franklin unlock announces once while an injected unlock stay
     }).observe(target, { childList: true, characterData: true, subtree: true });
   });
 
-  await commitFranklinUnlock(page, { version: 1, wonRoles: ["warburg"] });
+  await commitProgress(page, { version: 2, wonAs: ["warburg"], wins: 1 });
   await expect(announcement).toBeEmpty();
-  await commitFranklinUnlock(page, { version: 1, wonRoles: ["warburg", "curie"] });
+  await commitProgress(page, { version: 2, wonAs: ["warburg", "curie"], wins: 2 });
   await expect(announcement).toHaveText("Rosalind Franklin is now available.");
-  await expect(page.getByRole("radio")).toHaveCount(3);
-  await commitFranklinUnlock(page, { version: 1, wonRoles: ["warburg", "curie"] });
+  await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
+  await commitProgress(page, { version: 2, wonAs: ["warburg", "curie"], wins: 2 });
   await expect(announcement).toHaveAttribute("data-mutations", "1");
   expect(errors).toEqual([]);
 });
 
-test("Change fighter is match-over-only and returns through the paused chooser", async ({
+test("Change fighter is match-over-only, rerolls its opponent, and returns through the paused chooser", async ({
   page,
   baseURL,
 }) => {
@@ -815,16 +846,18 @@ test("Change fighter is match-over-only and returns through the paused chooser",
   await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
   const pausedBefore = await snapshot(page);
   await renderFrames(page);
-  expect(await snapshot(page)).toEqual(pausedBefore);
+  const pausedAfter = await snapshot(page);
+  expect(pausedAfter.phase).toBe(pausedBefore.phase);
+  expect(pausedAfter.round).toBe(pausedBefore.round);
+  expect(pausedAfter.fighters).toEqual(pausedBefore.fighters);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
   await page.getByRole("radio", { name: /Marie Curie/ }).check();
   await page.getByRole("button", { name: "Begin match" }).click();
   await expect(dialog).toBeHidden();
   await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
     .toEqual(["curie", "warburg"]);
-
   await page.evaluate(() => {
     const debug = (
       window as typeof window & {
@@ -837,8 +870,10 @@ test("Change fighter is match-over-only and returns through the paused chooser",
   await changeFighter.click();
   await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
   await page.getByRole("button", { name: "Begin match" }).click();
-
-  await injectFranklinUnlock(page);
+  await expect
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
+    .toEqual(["curie", "barbara_mcclintock"]);
+  await injectProgress(page);
   await page.evaluate(() => {
     const debug = (
       window as typeof window & {
@@ -852,15 +887,14 @@ test("Change fighter is match-over-only and returns through the paused chooser",
   await page.getByRole("radio", { name: /Rosalind Franklin/ }).check();
   await page.getByRole("button", { name: "Begin match" }).click();
   await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.role))
-    .toEqual(["franklin", "warburg"]);
-
+    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
+    .toEqual(["franklin", "curie"]);
   await page.evaluate(() => {
     const probe = window as typeof window & {
-      __fightSetFranklinUnlock?: (value: unknown) => void;
+      __fightSetProgress?: (value: unknown) => void;
       __fightDebug?: { forceMatch: (patch: unknown) => unknown };
     };
-    probe.__fightSetFranklinUnlock?.({ version: 1, wonRoles: [] });
+    probe.__fightSetProgress?.({ version: 2, wonAs: [], wins: 0 });
     probe.__fightDebug?.forceMatch({ phase: "matchOver", winner: 0 });
   });
   await renderFrames(page);

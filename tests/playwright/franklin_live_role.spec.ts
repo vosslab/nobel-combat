@@ -1,12 +1,22 @@
+// Selector contract: dialog controls: src/index.html:94-110; cards/radios: src/ui/chooser.ts:267-346.
+// Debug snapshots: src/playtest_probe.ts:59-80.
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { FRANKLIN_UNLOCK_STORAGE_KEY } from "../../src/franklin_storage";
+import { PROGRESS_STORAGE_KEY } from "../../src/progress/storage";
+import { decodeProgress } from "../../src/progress/unlocks";
 
 test.describe.configure({ mode: "serial" });
 
+const FRANKLIN_UNLOCK_PROGRESS = JSON.stringify({
+  version: 2,
+  wonAs: ["warburg", "curie"],
+  wins: 2,
+});
+const FRANKLIN_UNLOCKED_FIGHTER_COUNT = decodeProgress(FRANKLIN_UNLOCK_PROGRESS).unlockedSet.size;
+
 type GamepadFixture = { mapping: string; axes: number[]; buttons: { pressed: boolean }[] };
 type Fighter = {
-  role: string;
+  id: string;
   x: number;
   z: number;
   hp: number;
@@ -95,9 +105,10 @@ async function seedAndOpen(
       });
     });
   }
-  await page.addInitScript((key) => {
-    localStorage.setItem(key, JSON.stringify({ version: 1, wonRoles: ["warburg", "curie"] }));
-  }, FRANKLIN_UNLOCK_STORAGE_KEY);
+  await page.addInitScript(({ key, progress }) => localStorage.setItem(key, progress), {
+    key: PROGRESS_STORAGE_KEY,
+    progress: FRANKLIN_UNLOCK_PROGRESS,
+  });
   await page.goto(liveUrl(baseURL));
   await ready(page);
   return errors;
@@ -114,8 +125,7 @@ function observe(trace: Trace, current: State): void {
   trace.ko ||= current.fighters.some((fighter) => fighter.hp === 0);
   trace.roundOver ||= current.phase === "roundOver";
   trace.roundTwo ||= current.round >= 2;
-  trace.pair &&=
-    current.fighters[0]?.role === "franklin" && current.fighters[1]?.role === "warburg";
+  trace.pair &&= current.fighters[0]?.id === "franklin" && current.fighters[1]?.id === "warburg";
 }
 
 async function expectCleanFranklinRound(page: Page): Promise<void> {
@@ -126,7 +136,7 @@ async function expectCleanFranklinRound(page: Page): Promise<void> {
         phase: current.phase,
         round: current.round,
         winner: current.winner,
-        roles: current.fighters.map((fighter) => fighter.role),
+        roles: current.fighters.map((fighter) => fighter.id),
         hp: current.fighters.map((fighter) => fighter.hp),
         wins: current.fighters.map((fighter) => fighter.wins),
       };
@@ -210,17 +220,23 @@ test("keyboard starts durable Franklin and preserves the live role pair across p
 }) => {
   test.setTimeout(115_000);
   const errors = await seedAndOpen(page, baseURL!, 0x0f6d0001);
-  await expect(page.getByRole("radio")).toHaveCount(3);
-  await page.keyboard.down("ArrowLeft");
-  await frames(page);
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
-  await page.keyboard.up("ArrowLeft");
+  await expect(page.getByRole("radio")).toHaveCount(FRANKLIN_UNLOCKED_FIGHTER_COUNT);
+  const franklinChoice = page.getByRole("radio", { name: /Rosalind Franklin/ });
+  for (
+    let step = 0;
+    step < FRANKLIN_UNLOCKED_FIGHTER_COUNT && !(await franklinChoice.isChecked());
+    step++
+  ) {
+    await page.keyboard.press("ArrowLeft");
+    await frames(page);
+  }
+  await expect(franklinChoice).toBeChecked();
   await page.keyboard.down("Enter");
   await frames(page);
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
   expect(await state(page)).toMatchObject({
     phase: "fight",
-    fighters: [{ role: "franklin", state: "idle", attackHeld: false }, { role: "warburg" }],
+    fighters: [{ id: "franklin", state: "idle", attackHeld: false }, { id: "warburg" }],
   });
   await page.keyboard.up("Enter");
   await restartWithKeyboard(page);
@@ -242,15 +258,24 @@ test("synthetic standard gamepad releases chooser confirmation, restarts Frankli
 }) => {
   test.setTimeout(115_000);
   const errors = await seedAndOpen(page, baseURL!, 0x0f6d0002, true);
-  await setPad(page, pad([], [-1, 0, 0, 0]));
-  await frames(page);
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  const franklinChoice = page.getByRole("radio", { name: /Rosalind Franklin/ });
+  for (
+    let step = 0;
+    step < FRANKLIN_UNLOCKED_FIGHTER_COUNT && !(await franklinChoice.isChecked());
+    step++
+  ) {
+    await setPad(page, pad([], [-1, 0, 0, 0]));
+    await frames(page);
+    await setPad(page, null);
+    await frames(page);
+  }
+  await expect(franklinChoice).toBeChecked();
   await setPad(page, pad([9]));
   await frames(page);
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
   expect(await state(page)).toMatchObject({
     phase: "fight",
-    fighters: [{ role: "franklin", state: "idle", attackHeld: false }, { role: "warburg" }],
+    fighters: [{ id: "franklin", state: "idle", attackHeld: false }, { id: "warburg" }],
   });
   await setPad(page, null);
   await frames(page);

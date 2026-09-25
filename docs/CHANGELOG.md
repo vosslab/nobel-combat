@@ -1,22 +1,179 @@
 # Changelog
 
+## 2026-09-25
+
+### Additions and New Features
+
+- Promoted Barbara McClintock's reviewed canonical-rig body. The 1947 laboratory cues are built
+  into the asset, so the registry no longer adds a duplicate wire-glasses accessory.
+- Added `devel/capture_candidate_body.sh` to compute a candidate body's SHA and capture all eight
+  rig states in both roster positions. On macOS, the command must be launched with escalation so
+  Chromium runs outside the sandbox.
+- Recorded the photo-reference workflow: search for laureate portraits, including `young <name>` for
+  early-career views; verify identity/date against reliable sources and record supported cues in
+  dossiers.
+- Re-captured the current Hodgkin, Goodenough, and Buck bodies through the repository wrapper and
+  had an independent visual review inspect every state in both positions. All three candidates
+  still fail source-cue requirements and remain in M22; their concrete findings are in the active
+  roster status.
+- Started M22's Hodgkin, Goodenough, and Buck authored canonical-body lanes in parallel with
+  M14's McClintock canonical-body/export-order experiment. This records the initial authoring state;
+  McClintock later passed and was promoted.
+- Rebuilt Curie's runtime body with Mesh2Motion `female_31` and native combat clips. The retired
+  period-dress asset is excluded from the runtime model manifest.
+- Re-read the active fighters after fixed-step simulation and before presentation. A restart or
+  round reset can replace `Match.fighters` during that step; rendering now uses the replacement
+  objects for rigs, hit cues, and camera framing in the same frame.
+- Extended the rig-state capture runner with explicit player/opponent pairs and permanent Curie
+  coverage in both ordinary slots across idle, move, light, heavy, block, hit, down, and getup.
+  Independent review of the fresh captures found no spider-like deformation. Curie uses the shared
+  native-rig path; no production special case was added.
+- Added a quiet floor-level ring and presentation-only boundary marks to give the arena a clearer
+  playable frame while leaving fighter silhouettes, HUD, captions, and combat state unchanged.
+
+### Fixes and Maintenance
+
+- Bound the opt-in candidate-body capture override to a selected participant's canonical roster
+  body URL and a comparison fighter with a distinct body URL before browser launch, then publish
+  its receipt only after all browser-error assertions pass.
+- Added a fail-closed authored-body repair command that restores Blender's
+  reordered skin joints while preserving joint influences and inverse-bind rows.
+- Added accessible, actionable recovery for fighter-pair model loading: a `Retry fighter load`
+  button retries the selected pair, and retry state clears after success, selection changes, or a
+  match restart.
+- Made the Pages build check the generated model manifest without rewriting the tracked source
+  file. Special-effect meshes now grow only as needed and reuse disabled meshes, preserving all
+  overlapping projectile visuals. The capture helper now accepts every valid registry pair, and
+  roster smoke checks actual projected enabled-mesh bounds rather than debug flags. Corrected the
+  TypeScript Node-test command and made the super-card unit fixture generic.
+- Removed the unused fighter chooser wrapper and `NobelFighterId` type.
+- Corrected README prototype flow and Curie rig wording, marked stale plan baselines as historical,
+  aligned Markdown link labels and Playwright selector/wait style, consolidated the locked-page
+  progress-hook check into the existing secrecy test, removed stale selector and visual tuning
+  assertions, escaped authored Unicode punctuation, and updated the vertical-slice report's
+  current browser-suite counts.
+- Removed the chooser's no-op per-fighter help callback and made model-manifest filesystem failures
+  visible. Added or corrected browser selector-contract comments.
+- Marked M3 kit recommendations historical. Kept the distinct projectile-pattern contract and
+  moved implementation-only proofs plus the long Franklin endurance matrix to `tests/_temp/`.
+
+### Decisions and Failures
+
+- Preliminary M22 candidate-capture evidence keeps Goodenough on HOLD: his enlarged jacket does
+  not read as a dark suit. Hodgkin's pose is stable after skirt removal but she remains
+  indistinguishable from Curie. Buck remains FAIL: `female_8` conflicts with her dossier and its
+  blue chest shell becomes an oval at the back or hip in twisted poses.
+- Retired whole-body `clothingTint` and generic garment geometry from the appearance-kit design,
+  including lab coats, jackets, shirts/ties, and skirts. Hair, clothing, and silhouette require
+  authored canonical-rig bodies; Tier B is limited to supported rigid accessories.
+- McClintock's unsupported generic lab coat was removed and her appearance gate reopened. The
+  appearance-kit cleanup is complete: its runtime and compile-time contracts retain only glasses,
+  facial hair, and the manometer, with owned-resource cleanup on failed construction.
+
+### Developer Tests and Notes
+
+- Rebuilt `dist/` and passed the focused serial Playwright capture (1/1). The browser fetched
+  `mesh2motion_female_31.glb`; an independent review of all eight captured Curie states found no
+  spider-like deformation or detached geometry.
+- An earlier check passed with 51/51 Node tests, strict TypeScript, lint, and formatting. The live
+  Franklin endurance scenario also passed with fighter and rig states synchronized through rounds.
+- The earlier full serial Playwright suite passed 37/37 in 11.0 minutes after a fresh build. Fresh
+  full-HUD captures in both idle slot perspectives confirmed that the floor ring frames play and
+  remains subordinate to fighters and HUD.
+- Earlier audit verification: `./check_codebase.sh` passed 47/47 Node tests; the Pages build passed;
+  the serial browser run passed 36/36 with all 35 permanent browser cases plus the endurance matrix
+  later demoted to `tests/_temp/`. `npx playwright test --list` confirms 35 permanent cases.
+  Markdown links and `git diff --check` pass. All six independent audit passes completed.
+- Follow-up audit verification: `./check_codebase.sh` passed 48/48 Node tests with strict
+  TypeScript, lint, and format checks; the Pages build, Markdown-link check, and `git diff --check`
+  passed. Focused roster-smoke and paused-chooser cases passed, and the full serial Playwright suite
+  passed 35/35 in 9.6 minutes. A standalone McClintock capture was not produced because direct
+  Chromium launch failed with macOS `MachPortRendezvous` permission denied; M14's visual appearance
+  gate therefore remains open. The lowercase `docs/proposed-combat-roster.md` name remains
+  intentional until M33 closeout.
+
 ## 2026-09-24
 
 ### Additions and New Features
 
+- Started the 25-fighter roster expansion. Recorded the game's fun-first design and data-driven
+  roster decision, kept `proposed-combat-roster.md` temporary until closeout, and added the M2
+  schema report and typed draft for all 75 specials and 25 ordinary attack profiles.
+- Completed M3's look test and bounded CC0 model survey. The approved Steitz, Hodgkin, and Tsien
+  appearance pieces passed rendered review; tested motion candidates did not support a Tier A
+  assignment.
+- Completed M4's 22 source dossiers, including dated likeness evidence, independently checked
+  research hooks, and one fictional caption for every proposed special. Transferred the 66 captions
+  into their matching laureate drafts; the original fighters' captions remain unchanged.
+- Completed M11's pooled special visuals, per-fighter HUD banners, and seeded AI cadence review.
+  Muted court boundary ticks add orientation while keeping the action and captions clear.
+- Completed M16's nonblocking tier-3 card. It announces only the special name politely, retriggers
+  for repeated identical supers, and uses render time so the simulation continues.
+- Completed M15's shared meter controls: every fighter releases specials with `I` or standard
+  gamepad button 3, and the earlier button chords are retired. Warburg's manometer follows active
+  `specialTicks`, not the shared heavy pose.
+- Completed M17's roster-driven chooser with category cards, vertical selection, fighter details,
+  prize links, and a viewport-bounded responsive grid. The dialog now keeps readable text and fits
+  its card grid inside the available content width.
+- Completed M18's explicit player/opponent pairing. `Match` owns the validated pair, opponent picks
+  come from unlocked fighters through a seeded source, and changing fighters rerolls the opponent.
+  G1 passed (45/45), the focused reroll check passed, and the full serial Playwright suite passed
+  (36/36).
+- An initial Curie foot/toe-channel pruning reduced the spider-like pose in one capture, but it did
+  not establish safe animation compatibility. M20 replaced the incompatible period-dress rig with
+  the native Mesh2Motion body and direct clips.
+- Completed M21's roster smoke harness. Every registered fighter loads, releases a tier-three
+  special, and renders with a visible opponent; the full serial Playwright gate passed 37/37 in
+  11.1 minutes.
+- Implemented M19's initial shared appearance kit with glasses, facial hair, clothing tint,
+  jacket/lab coat, an initial primitive skirt, and manometer. Rendered review later retired the
+  garment and tint features because they could not remain coherent through combat poses; generic
+  hair and cardigan overlays were also removed after they detached or hovered.
+- Added the typed roster registry for the three existing fighters, including Franklin's explicit
+  non-laureate status, prize links, body paths, attack profiles, AI values, and unlock rules.
+- Replaced combat role fields with registry fighter ids. Match light and heavy startup, hit windows,
+  reach, damage, stun, and knockback now read from each fighter's `FighterStats`; the default pair is
+  Warburg and Curie, and the original special fields remain until M15.
+- Moved fighter names, labels, match status, and control help into `src/ui/hud.ts`; generated the
+  chooser radios from roster entries, resolved loaded models by roster body path, and sourced camera
+  heights from the roster. `src/main.ts` is now 590 lines.
 - Isolated AI behavior behind a seeded random source; local browser playtests use a fixed seed so
   live winner and progression scenarios remain repeatable.
 - Added a brief gold impact spark for unblocked damage and a blue spark for blocked damage; both
   follow the struck fighter and fade on render time.
 - Added soft directional shadows from loaded fighter meshes so their foot contact reads against the
   arena floor.
+- Added restrained arena boundary ticks beside the court center line to make the playable space
+  easier to read without pulling attention from the fighters.
 - Linked the live game near the README opening with descriptive link text.
 - Added the Franklin player role against Warburg AI while retaining `warburg | curie` as the
   Nobel-fighter vocabulary used by unlock progression. Franklin currently uses the existing
   `female_9` rig and the HUD identifies her as Rosalind Franklin; chooser unlock and
   progression remain separate milestones.
+- Added the on-demand two-instance rig loader. It caches source GLBs by scene and URL, creates
+  independent fighter resources for mirror matches, and disposes the current pair when a matchup
+  changes.
+- Generated `assets/models/MANIFEST.txt` from registry body paths and made the Pages build copy
+  and verify each listed model.
+- Added `Action.special` on keyboard `I` and standard gamepad button 3, plus a per-fighter
+  three-segment 0..300 meter. Successful combat events gain meter after the fighter's `meterGain`
+  multiplier, capped at 300: landed hits gain 20, blocked hits 8, taken hits 12, and blocks 10.
+- A rising Special press in `idle` or `move` selects the affordable tier, spends 100, 200, or 300
+  meter, carries meter into the next round, and clears meter on restart. The accessible HUD previews
+  the next special name. M9 only selects and spends a tier; M10 owns each special's pose and effects.
+- Completed M10's deterministic special interpreter: slot-owned authored blocks schedule effects,
+  run the authored pose and duration, honor guard and `ignoresBlock`, and clean effects after a KO.
+  The all-75 Match and DebugHarness proof, 25-row M32 budget diagnostic, G1 (57/57), Pages build,
+  and independent review passed; the broad diagnostic values remain tuning evidence, not product rules.
 - Added the pure, versioned Franklin unlock reducer for wins as both Nobel player roles; browser
   storage remains outside the reducer.
+- Completed M12's generic AI profile interpreter and M13's v2 unlock progression. Successful player
+  match wins are persisted before chooser updates and announcements; G1, Pages build, progression
+  matrix, and live-role browser checks passed.
+- M20 replaced Curie's incompatible period-dress IK rig with CC0 Mesh2Motion `female_31` and direct
+  native clip cloning; the runtime cross-rig mapping path was removed. The Gobkit Scholar Swordsman
+  survey candidate had intact limbs and full channel coverage but failed named-state readability,
+  so no new Tier A body was accepted.
 - Mapped Franklin to the existing female_9 rig with role-resolved names and combat-state clips,
   while retaining the asset's authored appearance and independent resources from Warburg.
 - Added serial Playwright captures for Curie's and Franklin's eight combat-state screenshots in
@@ -113,6 +270,29 @@
 
 ### Developer Tests and Notes
 
+- M1 and M2 passed `./check_codebase.sh` (49/49 Node tests) and
+  `source source_me.sh && python3 tests/test_markdown_links.py`. A one-time roster-shape check
+  reported 25 drafts and 75 specials.
+- M5 passed `./check_codebase.sh` with strict TypeScript, lint, formatting, and 52/52 Node tests;
+  the new registry invariant spec covers unique ids, three specials, valid unlock references, and
+  reachability from a starter.
+- M6 passed `./check_codebase.sh` with strict TypeScript, lint, formatting, and 52/52 Node tests;
+  existing numeric combat expectations remain unchanged, and Match and debug fixtures use registry
+  ids.
+- M7 passed `./check_codebase.sh`, `./build_github_pages.sh`, and all 15 focused Playwright tests
+  across `fighter_selection.spec.ts` and `control_help_layout.spec.ts`.
+- M8 passed `./check_codebase.sh` (53/53 Node tests), `./build_github_pages.sh`, and a temporary
+  Playwright mirror capture (1/1); snapshots confirmed distinct roots, skeletons, and materials for
+  Warburg vs Warburg. The screenshot is in ignored `tests/_temp/m8-warburg-mirror.png`.
+- M9 passed `./check_codebase.sh` (56/56 Node tests with strict TypeScript, lint, and formatting),
+  `./build_github_pages.sh`, and focused Playwright input parity (2/2), control-help layout (1/1),
+  fighter selection (14/14), and Franklin accessibility (6/6) checks. Local Markdown links passed.
+- M15, M17, and M19 passed the current `./check_codebase.sh` gate (45/45 Node tests), and the
+  GitHub Pages build passed. M15's named control-help and input-parity browser tests passed 3/3.
+  M17's latest-code selection and Franklin secrecy browser tests passed 15/15; the corrected chooser
+  grid test passed 2/2 and captures at 390x844, 768x1024, and 1280x800 passed independent image
+  review. M19's appearance-kit lifecycle tests passed 2/2; its 26-mesh capture had no browser errors
+  and passed independent image review.
 - After the arena shadow update, `./check_codebase.sh` passed 46/46 Node tests plus strict
   TypeScript, lint, and formatting; `./build_github_pages.sh` passed; the focused browser suite
   passed 4/4 for deterministic combat/camera/endurance, six keyboard/gamepad matches, traversal,

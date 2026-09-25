@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { DebugHarness } from "../src/debug_harness.ts";
-import { NEUTRAL } from "../src/match.ts";
+import { Match, NEUTRAL } from "../src/match.ts";
 
 const states = [
   ["idle", 0],
@@ -26,6 +26,26 @@ test("debug harness manually advances combat and snapshots are immutable", () =>
     initial.fighters[0].hp = 0;
   }, TypeError);
   assert.equal(harness.snapshot().fighters[0].hp, 100);
+
+  const effectsMatch = new Match();
+  effectsMatch.effects = [
+    {
+      kind: "scheduled",
+      owner: 0,
+      ticks: 0,
+      block: {
+        kind: "shield",
+        points: 1,
+        durationTicks: 1,
+        onHit: [{ kind: "strike", damage: 1, reach: 1, stunTicks: 1, knockback: 0 }],
+      },
+    },
+  ];
+  const effectSnapshot = new DebugHarness(effectsMatch).snapshot();
+  assert.throws(() => {
+    effectSnapshot.effects[0].block.onHit[0].damage = 99;
+  }, TypeError);
+  assert.equal(effectsMatch.effects[0].block.onHit[0].damage, 1);
 
   harness.forceFighter(0, { x: -0.8 });
   harness.forceFighter(1, { x: 0.8 });
@@ -64,6 +84,7 @@ test("debug harness rejects malformed test drivers", () => {
   assert.throws(() => harness.advance(-1), /non-negative safe integer/);
   assert.throws(() => harness.forceFighter(2, { hp: 1 }), /index/);
   assert.throws(() => harness.forceFighter(0, { state: "jump" }), /Unknown fighter state/);
+  assert.throws(() => harness.forceFighter(0, { id: "unknown" }), /Unknown fighter field/);
   assert.throws(() => harness.forceFighter(0, { hp: -1 }), /Fighter hp/);
   assert.throws(() => harness.forceFighter(0, { x: 9.1 }), /Fighter x/);
   assert.throws(() => harness.forceFighter(0, { ticks: -1 }), /Fighter ticks/);
@@ -74,32 +95,26 @@ test("debug harness rejects malformed test drivers", () => {
   assert.throws(() => harness.forceMatch({ extra: true }), /Unknown match field/);
   assert.throws(() => harness.tick([{ ...NEUTRAL, x: 1.1 }, NEUTRAL]), /Action x/);
   assert.throws(() => harness.tick([{ ...NEUTRAL, light: "yes" }, NEUTRAL]), /Action light/);
-});
-
-test("debug harness supports bounded Curie Separation Step state", () => {
-  const harness = new DebugHarness();
-  const curie = harness.forceFighter(0, {
-    role: "curie",
-    state: "light",
-    ticks: 24,
-    separationStep: true,
-    separationStepCooldown: 72,
-  });
-  assert.equal(curie.fighters[0].role, "curie");
-  assert.equal(curie.fighters[0].separationStepCooldown, 72);
+  assert.throws(() => harness.tick([{ ...NEUTRAL, special: "yes" }, NEUTRAL]), /Action special/);
   assert.throws(
-    () => harness.forceFighter(0, { separationStepCooldown: 73 }),
-    /separationStepCooldown/,
+    () => harness.tick([{ x: 0, z: 0, light: false, heavy: false, block: false }, NEUTRAL]),
+    /Action special/,
   );
-  assert.throws(
-    () => harness.forceFighter(0, { state: "idle", ticks: 0, separationStep: true }),
-    /Separation Step/,
-  );
+  assert.throws(() => harness.forceFighter(0, { meter: 300.1 }), /Fighter meter/);
 });
 
 test("debug harness accepts Franklin for direct state fixtures", () => {
   const harness = new DebugHarness();
-  const snapshot = harness.forceFighter(0, { role: "franklin", state: "block", ticks: 0 });
-  assert.equal(snapshot.fighters[0].role, "franklin");
+  harness.selectPlayer("franklin", "curie");
+  const snapshot = harness.forceFighter(0, { state: "block", ticks: 0 });
+  assert.equal(snapshot.fighters[0].id, "franklin");
   assert.equal(snapshot.fighters[0].state, "block");
+});
+
+test("debug harness delegates pair validation to Match", () => {
+  const harness = new DebugHarness();
+
+  assert.throws(() => harness.selectPlayer("unknown", "curie"), /Unknown fighter id/);
+  assert.throws(() => harness.selectPlayer("warburg", "warburg"), /own opponent/);
+  assert.throws(() => harness.forceFighter(0, { id: "curie" }), /Unknown fighter field/);
 });

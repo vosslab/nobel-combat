@@ -25,7 +25,7 @@ from pytest collection.
 
 - Fast pytest: `source source_me.sh && python3 -m pytest tests/`
 - Focused pytest: `source source_me.sh && python3 -m pytest tests/test_<name>.py -q`
-- Node: `node --test tests/test_<name>.mjs`
+- Node: `node --import tsx --test tests/test_<name>.mjs`
 - Non-browser E2E: `bash tests/e2e/e2e_<name>.sh` or
   `source source_me.sh && python3 tests/e2e/e2e_<name>.py`
 - Browser: use the repository's Playwright runner or explicit Playwright command.

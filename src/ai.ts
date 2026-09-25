@@ -1,5 +1,7 @@
 import { NEUTRAL } from "./match";
+import { specialTierForMeter } from "./match";
 import type { Action, Match } from "./match";
+import { fighterById } from "./roster/roster";
 
 export type RandomSource = () => number;
 export type AiController = (match: Match) => Action;
@@ -12,14 +14,9 @@ export function createRandomSource(seed: number): RandomSource {
   };
 }
 
-const APPROACH_DISTANCE = 1.55;
-const ATTACK_DISTANCE = 2.1;
 const LIGHT_COOLDOWN_TICKS = 42;
 const HEAVY_COOLDOWN_TICKS = 66;
 const BLOCK_TICKS = 28;
-const WARBURG_LACTATE_REACH = 2.45;
-const WARBURG_GLYCOLYSIS_REACH = 3.2;
-const CURIE_SEPARATION_REACH = 1.95;
 
 /**
  * Creates Blue's small, deterministic-per-random-source combat controller.
@@ -45,7 +42,8 @@ export function createAi(random: RandomSource = Math.random): AiController {
     const dx = red.x - blue.x;
     const dz = red.z - blue.z;
     const distance = Math.hypot(dx, dz);
-    if (previousHp !== undefined && blue.hp < previousHp && random() < 0.45) {
+    const profile = fighterById(blue.id).ai;
+    if (previousHp !== undefined && blue.hp < previousHp && random() < profile.blockChance) {
       blockTicks = BLOCK_TICKS;
     }
     previousHp = blue.hp;
@@ -53,49 +51,26 @@ export function createAi(random: RandomSource = Math.random): AiController {
     if (cooldown > 0) cooldown--;
 
     const canAct = blue.state === "idle" || blue.state === "move" || blue.state === "block";
-    if (canAct && cooldown === 0 && blockTicks === 0) {
-      if (
-        blue.role === "warburg" &&
-        blue.lactateDriveCooldown === 0 &&
-        distance > ATTACK_DISTANCE &&
-        distance <= WARBURG_LACTATE_REACH
-      ) {
-        cooldown = LIGHT_COOLDOWN_TICKS;
-        return { x: 0, z: 0, light: true, heavy: true, block: false };
-      }
-      if (
-        blue.role === "warburg" &&
-        blue.aerobicGlycolysisCooldown === 0 &&
-        !blue.aerobicLightReady &&
-        distance > WARBURG_LACTATE_REACH &&
-        distance <= WARBURG_GLYCOLYSIS_REACH
-      ) {
-        cooldown = LIGHT_COOLDOWN_TICKS;
-        return { x: 0, z: 0, light: true, heavy: false, block: true };
-      }
-      if (
-        blue.role === "curie" &&
-        blue.separationStepCooldown === 0 &&
-        distance <= CURIE_SEPARATION_REACH
-      ) {
-        cooldown = LIGHT_COOLDOWN_TICKS;
-        return { x: 0, z: 0, light: true, heavy: false, block: true };
+    if (canAct && blockTicks === 0 && blue.meter >= 100) {
+      const tier = specialTierForMeter(blue.meter);
+      const specialRange = profile.specialRange[tier - 1];
+      if (specialRange !== undefined && distance <= specialRange) {
+        return { ...NEUTRAL, special: true };
       }
     }
 
-    const attack = canAct && distance < ATTACK_DISTANCE && cooldown === 0 && blockTicks === 0;
-    if (attack && blue.role === "warburg" && blue.aerobicLightReady) {
-      cooldown = LIGHT_COOLDOWN_TICKS;
-      return { x: 0, z: 0, light: true, heavy: false, block: false };
-    }
-    if (attack) cooldown = random() < 0.3 ? HEAVY_COOLDOWN_TICKS : LIGHT_COOLDOWN_TICKS;
+    const attack =
+      canAct && distance <= profile.preferredRange && cooldown === 0 && blockTicks === 0;
+    const heavy = attack && random() < profile.heavyChance;
+    if (attack) cooldown = heavy ? HEAVY_COOLDOWN_TICKS : LIGHT_COOLDOWN_TICKS;
 
     return {
-      x: distance > APPROACH_DISTANCE ? (dx / (distance || 1)) * 0.72 : 0,
-      z: distance > APPROACH_DISTANCE ? (dz / (distance || 1)) * 0.72 : 0,
-      light: attack && cooldown === LIGHT_COOLDOWN_TICKS,
-      heavy: attack && cooldown === HEAVY_COOLDOWN_TICKS,
+      x: distance > profile.preferredRange ? (dx / (distance || 1)) * 0.72 : 0,
+      z: distance > profile.preferredRange ? (dz / (distance || 1)) * 0.72 : 0,
+      light: attack && !heavy,
+      heavy,
       block: blockTicks > 0,
+      special: false,
     };
   };
 }

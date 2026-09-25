@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { ROSTER } from "../src/roster/roster.ts";
 
 const REQUIRED_CLIPS = Object.freeze({
   idle: "Fighting Idle",
@@ -43,6 +44,21 @@ test("authoritative combat modules have no rendering or asset imports", async ()
   }
 });
 
+test("model manifest lists the unique roster bodies in declaration order", async () => {
+  const manifest = await readFile(repositoryPath("assets/models/MANIFEST.txt"), "utf8");
+  assert.ok(manifest.endsWith("\n"), "model manifest must end with a newline");
+  const listedModels = manifest.trimEnd().split(/\r?\n/);
+  const rosterModels = [...new Set(Object.values(ROSTER).map((fighter) => fighter.body))];
+  assert.deepEqual(listedModels, rosterModels);
+  for (const modelPath of listedModels) {
+    assert.match(modelPath, /^assets\/models\/[a-z0-9_]+\.glb$/);
+    assert.ok(
+      (await readFile(repositoryPath(modelPath))).length > 0,
+      `${modelPath} must be non-empty`,
+    );
+  }
+});
+
 async function readGlb(relativePath) {
   return readGlbJson(await readFile(repositoryPath(relativePath)));
 }
@@ -77,87 +93,37 @@ function skinJointNames(document, label, expectedJointCount = 66) {
   return names;
 }
 
-test("Mesh2Motion human models retain matching complete local rigs", async () => {
-  const [male, doctor, curie] = await Promise.all([
-    readGlb("assets/models/mesh2motion_male_5.glb"),
-    readGlb("assets/models/mesh2motion_doctor_m.glb"),
-    readGlb("assets/models/mesh2motion_female_9.glb"),
-  ]);
-
-  const maleJointNames = skinJointNames(male, "Mesh2Motion male_5");
-  const doctorJointNames = skinJointNames(doctor, "Mesh2Motion doctor_m");
-  const curieJointNames = skinJointNames(curie, "Mesh2Motion female_9");
-  assert.deepEqual(
-    doctorJointNames,
-    maleJointNames,
-    "doctor_m joint ordering must exactly match male_5 for native animation reuse",
-  );
-  assert.deepEqual(
-    curieJointNames,
-    maleJointNames,
-    "female_9 joint ordering must exactly match the existing local rigs for native animation reuse",
-  );
-});
-
-test("Curie's period-dress rig covers the local animations through its explicit bone map", async () => {
-  const [curie, base, addon, rendering] = await Promise.all([
-    readGlb("assets/models/curie_period.glb"),
-    readGlb("assets/animations/mesh2motion_human_base.glb"),
-    readGlb("assets/animations/mesh2motion_human_addon.glb"),
-    readFile(repositoryPath("src/rigged_fighter.ts"), "utf8"),
-  ]);
-  const curieRigNames = new Set(skinJointNames(curie, "Curie's period-dress model", 84));
-  assert.ok(curie.meshes?.length > 0, "Curie's GLB must contain rendered mesh data");
-
-  const mapBlock = rendering.match(
-    /const CURIE_BONE_MAP = new Map<string, string>\(\[([\s\S]*?)\]\);/,
-  )?.[1];
-  assert.ok(mapBlock, "Curie must use the explicit asset-specific animation bone map");
-  const mapEntries = [...mapBlock.matchAll(/\["([^"]+)", "([^"]+)"\]/g)].map(
-    ([, sourceName, targetName]) => [sourceName, targetName],
-  );
-  assert.ok(mapEntries.length >= 50, "the map must cover the body's animated joints");
-  assert.equal(new Set(mapEntries.map(([sourceName]) => sourceName)).size, mapEntries.length);
-  for (const [, targetName] of mapEntries) {
-    assert.ok(curieRigNames.has(targetName), `Curie rig is missing mapped joint '${targetName}'`);
-  }
-
-  const animations = new Map([...animationByName(base), ...animationByName(addon)]);
-  const documents = new Map([
-    ...[...animationByName(base).keys()].map((name) => [name, base]),
-    ...[...animationByName(addon).keys()].map((name) => [name, addon]),
-  ]);
-  const sourceToTarget = new Map(mapEntries);
-  for (const [state, clipName] of Object.entries(REQUIRED_CLIPS)) {
-    const animation = animations.get(clipName);
-    const document = documents.get(clipName);
-    assert.ok(animation && document, `${state} requires local clip '${clipName}'`);
-    const mappedTargets = new Set(
-      animation.channels
-        .map((channel) => document.nodes?.[channel.target?.node]?.name)
-        .map((sourceName) => sourceToTarget.get(sourceName))
-        .filter((targetName) => curieRigNames.has(targetName)),
-    );
-    assert.ok(
-      mappedTargets.size >= 50,
-      `${state} clip '${clipName}' must animate at least 50 Curie skeletal joints`,
+test("registered bodies retain the canonical native Mesh2Motion skeleton", async () => {
+  const canonical = await readGlb("assets/models/mesh2motion_male_5.glb");
+  const canonicalJointNames = skinJointNames(canonical, "Mesh2Motion male_5");
+  const rosterBodies = [...new Set(Object.values(ROSTER).map((fighter) => fighter.body))];
+  for (const body of rosterBodies) {
+    const model = await readGlb(body);
+    assert.ok(model.meshes?.length > 0, `${body} must contain rendered mesh data`);
+    for (const [nodeIndex, node] of (model.nodes ?? []).entries()) {
+      if (node.mesh !== undefined) {
+        assert.equal(
+          node.skin,
+          0,
+          `${body} mesh-bearing node ${nodeIndex} must use its canonical skin`,
+        );
+      }
+    }
+    assert.deepEqual(
+      skinJointNames(model, body),
+      canonicalJointNames,
+      `${body} must retain the canonical native skeleton for direct clip cloning`,
     );
   }
 });
 
-test("curated Mesh2Motion animations cover every combat state on all local human rigs", async () => {
-  const [male, doctor, curie, base, addon] = await Promise.all([
+test("curated Mesh2Motion clips target the complete canonical skeleton", async () => {
+  const [canonical, base, addon] = await Promise.all([
     readGlb("assets/models/mesh2motion_male_5.glb"),
-    readGlb("assets/models/mesh2motion_doctor_m.glb"),
-    readGlb("assets/models/mesh2motion_female_9.glb"),
     readGlb("assets/animations/mesh2motion_human_base.glb"),
     readGlb("assets/animations/mesh2motion_human_addon.glb"),
   ]);
-  const rigNamesByModel = new Map([
-    ["male_5", new Set(skinJointNames(male, "Mesh2Motion male_5"))],
-    ["doctor_m", new Set(skinJointNames(doctor, "Mesh2Motion doctor_m"))],
-    ["female_9", new Set(skinJointNames(curie, "Mesh2Motion female_9"))],
-  ]);
+  const canonicalJointNames = new Set(skinJointNames(canonical, "Mesh2Motion male_5"));
 
   const baseAnimations = animationByName(base);
   const addonAnimations = animationByName(addon);
@@ -165,18 +131,14 @@ test("curated Mesh2Motion animations cover every combat state on all local human
   for (const [state, clipName] of Object.entries(REQUIRED_CLIPS)) {
     const animation = allAnimations.get(clipName);
     assert.ok(animation, `${state} requires local native clip '${clipName}'`);
-    assert.ok(animation.channels?.length > 0, `${state} clip must animate a skeletal target`);
-    for (const channel of animation.channels) {
-      const targetName =
-        animation === baseAnimations.get(clipName)
-          ? base.nodes?.[channel.target?.node]?.name
-          : addon.nodes?.[channel.target?.node]?.name;
-      for (const [modelName, rigNames] of rigNamesByModel) {
-        assert.ok(
-          rigNames.has(targetName),
-          `${state} clip '${clipName}' targets '${targetName}', absent from ${modelName} rig`,
-        );
-      }
-    }
+    const document = animation === baseAnimations.get(clipName) ? base : addon;
+    const targets = new Set(
+      animation.channels.map((channel) => document.nodes?.[channel.target?.node]?.name),
+    );
+    assert.deepEqual(
+      targets,
+      canonicalJointNames,
+      `${state} clip '${clipName}' must target the complete canonical skeleton`,
+    );
   }
 });

@@ -3,7 +3,16 @@ import { mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const NEUTRAL = Object.freeze({ x: 0, z: 0, light: false, heavy: false, block: false });
+// Browser hooks come from `src/playtest_probe.ts:59-80` and `src/debug_harness.ts:241-317`;
+// the canvas and HUD ids are defined in `src/index.html:11-93`.
+const NEUTRAL = Object.freeze({
+  x: 0,
+  z: 0,
+  light: false,
+  heavy: false,
+  block: false,
+  special: false,
+});
 const RED = 0;
 const BLUE = 1;
 const RIG_POSITION_TOLERANCE = 0.0001;
@@ -36,8 +45,8 @@ function seededRandom(seed) {
   };
 }
 
-function action(x = 0, z = 0, light = false, heavy = false, block = false) {
-  return { x, z, light, heavy, block };
+function action(x = 0, z = 0, light = false, heavy = false, block = false, special = false) {
+  return { x, z, light, heavy, block, special };
 }
 
 function distance(snapshot) {
@@ -81,10 +90,6 @@ async function snapshot(page) {
         redHealthLabel: get("#red-health")?.parentElement?.getAttribute("aria-label") ?? "",
         blueHealthLabel: get("#blue-health")?.parentElement?.getAttribute("aria-label") ?? "",
         status: get("#status")?.textContent ?? "",
-        moveName: get("#move-name")?.textContent ?? "",
-        curieIndicatorHidden: get("#curie-indicator")?.hidden ?? true,
-        curieName: get("#curie-indicator")?.textContent?.trim() ?? "",
-        curieMeterWidth: get("#curie-meter-fill")?.style.width ?? "",
       },
     };
   });
@@ -111,15 +116,6 @@ function assertRenderedRigSync(snapshot, label) {
       `${label}: rig ${index} root yaw drifted from fighter facing`,
     );
   }
-}
-
-function assertCueAt(cue, fighter, label) {
-  assert(cue?.enabled, `${label}: cue was not visible`);
-  assert(
-    Math.abs(cue.x - fighter.x) <= RIG_POSITION_TOLERANCE &&
-      Math.abs(cue.z - fighter.z) <= RIG_POSITION_TOLERANCE,
-    `${label}: cue did not follow the role-resolved fighter`,
-  );
 }
 
 function assertImpactCueAt(cue, fighter, yaw, label) {
@@ -154,18 +150,19 @@ async function forceFighter(page, index, patch) {
   });
 }
 
+async function selectPair(page, playerId, opponentId) {
+  await page.evaluate(
+    ({ playerId, opponentId }) => window.__fightDebug.selectPlayer(playerId, opponentId),
+    { playerId, opponentId },
+  );
+}
+
 function assertValid(snapshot, label) {
   const states = new Set(["idle", "move", "light", "heavy", "block", "hit", "down", "getup"]);
   assert(["fight", "roundOver", "matchOver"].includes(snapshot.phase), `${label}: invalid phase`);
   assert(Number.isInteger(snapshot.round) && snapshot.round >= 1, `${label}: invalid round`);
   for (const fighter of snapshot.fighters) {
-    assert(
-      fighter.role === "warburg" ||
-        fighter.role === "curie" ||
-        fighter.role === "franklin" ||
-        fighter.role === "opponent",
-      `${label}: unknown fighter role`,
-    );
+    assert(["warburg", "curie", "franklin"].includes(fighter.id), `${label}: unknown fighter id`);
     assert(states.has(fighter.state), `${label}: invalid fighter state ${fighter.state}`);
     assert(
       Number.isFinite(fighter.x) && Number.isFinite(fighter.z),
@@ -177,39 +174,6 @@ function assertValid(snapshot, label) {
       `${label}: invalid health`,
     );
     assert(Number.isFinite(fighter.facing), `${label}: nonfinite facing`);
-    assert(
-      Number.isInteger(fighter.lactateDriveCooldown) &&
-        fighter.lactateDriveCooldown >= 0 &&
-        fighter.lactateDriveCooldown <= 44,
-      `${label}: invalid Lactate Drive cooldown`,
-    );
-    assert(
-      Number.isInteger(fighter.aerobicOutputTicks) &&
-        fighter.aerobicOutputTicks >= 0 &&
-        fighter.aerobicOutputTicks <= 72,
-      `${label}: invalid Aerobic Glycolysis output timer`,
-    );
-    assert(
-      Number.isInteger(fighter.aerobicGlycolysisCooldown) &&
-        fighter.aerobicGlycolysisCooldown >= 0 &&
-        fighter.aerobicGlycolysisCooldown <= 150,
-      `${label}: invalid Aerobic Glycolysis cooldown`,
-    );
-    assert(
-      Number.isInteger(fighter.separationStepCooldown) &&
-        fighter.separationStepCooldown >= 0 &&
-        fighter.separationStepCooldown <= 72,
-      `${label}: invalid Separation Step cooldown`,
-    );
-    assert(!fighter.lactateDrive || fighter.state === "light", `${label}: orphaned drive state`);
-    assert(
-      !fighter.separationStep || fighter.state === "light",
-      `${label}: orphaned Separation Step`,
-    );
-    assert(
-      !fighter.aerobicLightReady || fighter.aerobicOutputTicks > 0,
-      `${label}: expired powered-light charge`,
-    );
   }
   const camera = snapshot.camera;
   assert(
@@ -233,8 +197,8 @@ function assertValid(snapshot, label) {
   };
   for (const [index, fighter] of snapshot.fighters.entries()) {
     assert(
-      snapshot.rigs?.[index]?.fighterName === expectedRigName(fighter.role),
-      `${label}: rig ${index} did not follow ${fighter.role} presentation`,
+      snapshot.rigs?.[index]?.fighterName === expectedRigName(fighter.id),
+      `${label}: rig ${index} did not follow ${fighter.id} presentation`,
     );
   }
   for (const [index, rig] of snapshot.rigs.entries()) {
@@ -274,8 +238,8 @@ function assertValid(snapshot, label) {
   assert(snapshot.hud.blueHealth === `${blue.hp}%`, `${label}: blue health HUD drift`);
   assert(snapshot.hud.redWins.includes(String(red.wins)), `${label}: red wins HUD drift`);
   assert(snapshot.hud.blueWins.includes(String(blue.wins)), `${label}: blue wins HUD drift`);
-  const redName = expectedRigName(red.role);
-  const blueName = expectedRigName(blue.role);
+  const redName = expectedRigName(red.id);
+  const blueName = expectedRigName(blue.id);
   assert(snapshot.hud.redName === redName.toUpperCase(), `${label}: red fighter name drift`);
   assert(
     snapshot.hud.blueName === `${blueName} AI`.toUpperCase(),
@@ -375,7 +339,6 @@ async function runCombat(page, report) {
     state.fighters[BLUE].hp === 72 && state.fighters[BLUE].state === "down",
     "heavy attack did not knock down",
   );
-  assert(state.hud.moveName.includes("OXYGEN TRANSFER"), "heavy move label did not synchronize");
   await page.screenshot({ path: resolve(EVIDENCE_DIR, "oxygen-transfer-contact.png") });
   report.states.add("heavy");
   report.states.add("down");
@@ -387,156 +350,15 @@ async function runCombat(page, report) {
   assertValid(state, "combat");
 }
 
-async function runWarburgPowers(page, report) {
-  await restart(page);
-  await forceFighter(page, RED, { x: 0, z: 0 });
-  await forceFighter(page, BLUE, { x: 2.6, z: 0 });
-  let state = await advance(page, 1, action(0, 0, true, true));
-  assert(
-    state.fighters[RED].lactateDrive && state.fighters[RED].lactateDriveCooldown === 44,
-    "Lactate Drive chord did not start with its cooldown",
-  );
-  assert(state.hud.moveName.includes("LACTATE DRIVE"), "Lactate Drive label did not synchronize");
-  await page.screenshot({ path: resolve(EVIDENCE_DIR, "lactate-drive-start.png") });
-  state = await advance(page, 9);
-  assert(Math.abs(state.fighters[RED].x - 0.648) < 1e-8, "Lactate Drive startup distance drift");
-  assert(state.fighters[BLUE].hp === 100, "Lactate Drive hit before its ten-tick startup");
-  state = await advance(page, 1);
-  assert(
-    state.fighters[BLUE].hp === 82 && state.fighters[BLUE].ticks === 14,
-    "Lactate Drive did not apply its one hit and 14-tick stun",
-  );
-  report.moves = ["Lactate Drive"];
-
-  await restart(page);
-  await forceFighter(page, RED, { x: 0, z: 0 });
-  await forceFighter(page, BLUE, { x: 2.6, z: 0 });
-  await advance(page, 1, action(0, 0, true, true), action(0, 0, false, false, true));
-  state = await advance(page, 10, NEUTRAL, action(0, 0, false, false, true));
-  assert(
-    state.fighters[BLUE].hp === 96 && state.fighters[BLUE].state === "block",
-    "held block did not reduce Lactate Drive to four damage",
-  );
-
-  await restart(page);
-  await forceFighter(page, RED, { x: 0, z: 0 });
-  await forceFighter(page, BLUE, { x: 1.5, z: 0 });
-  state = await advance(page, 1, action(0, 0, true, false, true));
-  assert(
-    state.fighters[RED].aerobicOutputTicks === 72 &&
-      state.fighters[RED].aerobicGlycolysisCooldown === 150 &&
-      state.fighters[RED].aerobicLightReady,
-    "Aerobic Glycolysis chord did not start its output window",
-  );
-  assert(
-    state.hud.moveName.includes("AEROBIC GLYCOLYSIS"),
-    "Aerobic Glycolysis label did not synchronize",
-  );
-  await page.screenshot({ path: resolve(EVIDENCE_DIR, "aerobic-glycolysis-window.png") });
-  state = await advance(page, 71);
-  assert(state.fighters[RED].aerobicOutputTicks === 1, "output timer lost a tick");
-  state = await advance(page, 1);
-  assert(
-    state.fighters[RED].aerobicOutputTicks === 0 && !state.fighters[RED].aerobicLightReady,
-    "output window or powered-light charge failed to expire",
-  );
-  report.moves.push("Aerobic Glycolysis");
-
-  await restart(page);
-  await forceFighter(page, RED, { x: 0, z: 0 });
-  await forceFighter(page, BLUE, { x: 8, z: 0 });
-  await advance(page, 1, action(0, 0, true, false, true));
-  await advance(page, 1);
-  state = await advance(page, 1, action(1, 0));
-  assert(Math.abs(state.fighters[RED].x - 0.115) < 1e-8, "output movement speed did not increase");
-
-  await restart(page);
-  await forceFighter(page, RED, { x: 0, z: 0 });
-  await forceFighter(page, BLUE, { x: 1.5, z: 0 });
-  await advance(page, 1, action(0, 0, true, false, true));
-  await advance(page, 1);
-  state = await advance(page, 1, action(0, 0, true));
-  assert(state.fighters[RED].state === "light", "powered light failed to start");
-  state = await advance(page, 7);
-  assert(
-    state.fighters[BLUE].hp === 86 &&
-      state.fighters[BLUE].ticks === 14 &&
-      !state.fighters[RED].aerobicLightReady,
-    "Aerobic Glycolysis did not power and consume the next successful light",
-  );
-  await page.screenshot({ path: resolve(EVIDENCE_DIR, "aerobic-powered-light.png") });
-  assertValid(state, "Warburg research powers");
-}
-
-async function runCurieMatchRule(page, report) {
-  await restart(page);
-  await forceFighter(page, RED, { role: "curie", x: 0, z: 0, attackHeld: false });
-  await forceFighter(page, BLUE, {
-    role: "warburg",
-    x: 1.95,
-    z: 0,
-    hp: 100,
-    state: "idle",
-    ticks: 0,
-  });
-  let state = await advance(page, 1, action(0, 0, true, false, true));
-  assert(
-    state.fighters[RED].separationStep &&
-      state.fighters[RED].ticks === 24 &&
-      state.fighters[RED].separationStepCooldown === 72,
-    "Curie Separation Step did not start with its fixed timing",
-  );
-  assert(
-    !state.hud.curieIndicatorHidden,
-    "Curie research cue did not appear at Separation Step start",
-  );
-  assert(
-    state.hud.curieName.includes("SEPARATION STEP") &&
-      state.hud.curieName.includes("FRACTION / ACTIVITY"),
-    "Curie research cue did not name the move and measurement readout",
-  );
-  assert(
-    Number.parseFloat(state.hud.curieMeterWidth) === 0,
-    "Curie cue did not begin at zero progress",
-  );
-  state = await advance(page, 5);
-  assert(state.fighters[BLUE].hp === 100, "Curie Separation Step hit before post-input tick six");
-  assert(
-    Number.parseFloat(state.hud.curieMeterWidth) > 20 &&
-      Number.parseFloat(state.hud.curieMeterWidth) < 22,
-    "Curie research cue did not advance from authoritative attack ticks",
-  );
-  await page.screenshot({ path: resolve(EVIDENCE_DIR, "curie-separation-step.png") });
-  state = await advance(page, 1);
-  assert(
-    state.fighters[BLUE].hp === 84 && state.fighters[BLUE].ticks === 16,
-    "Curie Separation Step did not apply its bounded contact",
-  );
-  state = await advance(page, 18);
-  assert(!state.fighters[RED].separationStep, "Curie Separation Step did not recover");
-  assert(state.hud.curieIndicatorHidden, "Curie research cue remained after recovery");
-
-  await restart(page);
-  await forceFighter(page, RED, { role: "curie", x: 0, z: 0, attackHeld: false });
-  await forceFighter(page, BLUE, { role: "warburg" });
-  state = await advance(page, 1, action(0, 0, true, false, true));
-  assert(!state.hud.curieIndicatorHidden, "Curie research cue was absent before interruption");
-  await forceFighter(page, RED, { state: "hit", ticks: 16, separationStep: false });
-  state = await snapshot(page);
-  assert(state.hud.curieIndicatorHidden, "Curie research cue remained after interruption");
-  assertValid(state, "Curie direct Match role");
-  report.moves.push("Separation Step");
-}
-
 async function runRoleAwarePresentation(page, report) {
   const pairs = [
     ["warburg", "curie"],
     ["curie", "warburg"],
   ];
   for (const [redRole, blueRole] of pairs) {
-    await restart(page);
-    await forceFighter(page, RED, { role: redRole, x: -0.8, z: 0, hp: 63, wins: 1 });
-    await forceFighter(page, BLUE, { role: blueRole, x: 0.8, z: 0, hp: 47, wins: 0 });
+    await selectPair(page, redRole, blueRole);
+    await forceFighter(page, RED, { x: -0.8, z: 0, hp: 63, wins: 1 });
+    await forceFighter(page, BLUE, { x: 0.8, z: 0, hp: 47, wins: 0 });
     let state = await snapshot(page);
     assertValid(state, `${redRole} versus ${blueRole} presentation`);
     assertRenderedRigSync(state, `${redRole} versus ${blueRole} presentation`);
@@ -551,45 +373,6 @@ async function runRoleAwarePresentation(page, report) {
     assert(
       state.hud.blueHealth === "47%",
       `${redRole} versus ${blueRole}: blue health name mismatch`,
-    );
-    const warburgIndex = redRole === "warburg" ? RED : BLUE;
-    const curieIndex = redRole === "curie" ? RED : BLUE;
-    const targetIndex = warburgIndex === RED ? BLUE : RED;
-    await forceFighter(page, warburgIndex, { state: "idle", ticks: 0, attackHeld: false });
-    await forceFighter(page, targetIndex, { state: "idle", ticks: 0, attackHeld: false });
-    const heavyActions = [NEUTRAL, NEUTRAL];
-    heavyActions[warburgIndex] = action(0, 0, false, true);
-    await advance(page, 1, heavyActions[RED], heavyActions[BLUE]);
-    state = await advance(page, 14);
-    assert(
-      state.hud.moveName.includes("OXYGEN TRANSFER"),
-      `${redRole} versus ${blueRole}: Warburg move cue did not follow his role`,
-    );
-    assertCueAt(
-      state.cues?.oxygen,
-      state.fighters[targetIndex],
-      `${redRole} versus ${blueRole}: Oxygen Transfer`,
-    );
-    await forceFighter(page, warburgIndex, { state: "idle", ticks: 0, attackHeld: false });
-    const outputActions = [NEUTRAL, NEUTRAL];
-    outputActions[warburgIndex] = action(0, 0, true, false, true);
-    state = await advance(page, 1, outputActions[RED], outputActions[BLUE]);
-    assertCueAt(
-      state.cues?.output,
-      state.fighters[warburgIndex],
-      `${redRole} versus ${blueRole}: Aerobic Glycolysis`,
-    );
-    await forceFighter(page, curieIndex, {
-      state: "light",
-      ticks: 19,
-      attackHeld: true,
-      separationStep: true,
-      separationStepCooldown: 67,
-    });
-    state = await snapshot(page);
-    assert(
-      !state.hud.curieIndicatorHidden,
-      `${redRole} versus ${blueRole}: Curie research cue did not follow her role`,
     );
     await page.evaluate(() => window.__fightDebug.forceMatch({ phase: "matchOver", winner: 0 }));
     state = await snapshot(page);
@@ -643,9 +426,8 @@ async function runFranklinPresentation(page, report) {
     getup: 1,
   };
   for (const [combatState, ticks] of Object.entries(stateTicks)) {
-    await restart(page);
+    await selectPair(page, "franklin", "warburg");
     await forceFighter(page, RED, {
-      role: "franklin",
       x: -1.35,
       z: 0,
       state: combatState,
@@ -654,7 +436,6 @@ async function runFranklinPresentation(page, report) {
       hitDone: false,
     });
     await forceFighter(page, BLUE, {
-      role: "warburg",
       x: 1.35,
       z: 0,
       state: combatState,
@@ -889,8 +670,6 @@ async function main() {
       await runMovement(page, report);
       await runCameraControls(page, report);
       await runCombat(page, report);
-      await runWarburgPowers(page, report);
-      await runCurieMatchRule(page, report);
       await runRoleAwarePresentation(page, report);
       await runFranklinPresentation(page, report);
       await koRoundMatchAndRestart(page, report);

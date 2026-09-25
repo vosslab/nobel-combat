@@ -1,5 +1,7 @@
 import { chromium } from "playwright";
 
+// Chooser controls are in `src/index.html:94-110` and `src/ui/chooser.ts:297-304`;
+// live traversal state comes from `src/playtest_probe.ts:59-78`.
 function readOption(name, fallback) {
   const position = process.argv.indexOf(name);
   if (position < 0) return fallback;
@@ -66,7 +68,7 @@ async function confirmFighter(page, device) {
     () =>
       window
         .__fightSnapshot?.()
-        .fighters.map((fighter) => fighter.role)
+        .fighters.map((fighter) => fighter.id)
         .join(",") === "warburg,curie",
   );
   await waitForNeutralFrame(page);
@@ -147,7 +149,7 @@ async function run(device) {
     round: s.round,
     hp: s.fighters.map((f) => f.hp),
     wins: s.fighters.map((f) => f.wins),
-    roles: s.fighters.map((f) => f.role),
+    roles: s.fighters.map((f) => f.id),
   };
   const beforeDirectional = s.fighters[0].x;
   if (device === "gamepad") {

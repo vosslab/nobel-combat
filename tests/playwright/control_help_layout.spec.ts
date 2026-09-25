@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-// Selector contract: the user-facing controls panel and action buttons are in
-// src/index.html:90-98; responsive bounds are owned by src/style.css:62-74 and 171-194.
+// Selector contract: controls and match actions are in `src/index.html:112-120`;
+// help layout and responsive rules are in `src/style.css:155-167,344-389`.
 const VIEWPORTS = [
   { width: 320, height: 568 },
   { width: 375, height: 667 },

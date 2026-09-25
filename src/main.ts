@@ -13,23 +13,39 @@ import {
 } from "@babylonjs/core";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { Match, NEUTRAL } from "./match";
-import type { Action, Fighter, PlayerFighterRole } from "./match";
+import type { Action, Fighter } from "./match";
+import { fighterById, ROSTER } from "./roster/roster";
+import type { FighterId } from "./roster/roster";
+import { FighterChooser } from "./ui/chooser";
+import { HitCues } from "./ui/hit_cues";
+import { CONTROL_HELP, renderHud } from "./ui/hud";
+import { SuperCard } from "./ui/super_card";
+import { SpecialVfx } from "./vfx";
 import { DebugHarness } from "./debug_harness";
-import { decodeFranklinUnlock, lockedFranklinUnlock } from "./franklin_unlock";
-import type { FranklinUnlockState } from "./franklin_unlock";
-import { consumeCompletedNobelMatchWin } from "./franklin_progression";
-import { readFranklinUnlock, writeFranklinUnlock } from "./franklin_storage";
+import { consumeCompletedPlayerMatchWin } from "./progress/progression";
+import { readProgress, writeProgress } from "./progress/storage";
+import { decodeProgress, starterProgress } from "./progress/unlocks";
+import type { ProgressState } from "./progress/unlocks";
 import { installPlaytestProbe, playtestMode } from "./playtest_probe";
 import { createAi, createRandomSource } from "./ai";
 import { mapPlayerInput, mapSelectionInput } from "./input";
-import { loadRiggedFighters } from "./rigged_fighter";
-import type { RiggedFighterModel } from "./rigged_fighter";
+import { loadMatchFighters } from "./rig/loader";
+import type { RiggedFighterModel } from "./rig/presentation";
 
-const aiSeed = playtestMode() ? 0x1 : Math.floor(Math.random() * 2 ** 32);
+const fixedPlaytestSeed = 0x1;
+const aiSeed = playtestMode() ? fixedPlaytestSeed : Math.floor(Math.random() * 2 ** 32);
+const opponentSeed = playtestMode()
+  ? fixedPlaytestSeed ^ 0x9e3779b9
+  : Math.floor(Math.random() * 2 ** 32);
 const aiRandom = createRandomSource(aiSeed);
+const opponentRandom = createRandomSource(opponentSeed);
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 const redHealth = document.querySelector<HTMLElement>("#red-health");
 const blueHealth = document.querySelector<HTMLElement>("#blue-health");
+const redMeter = document.querySelector<HTMLElement>("#red-meter");
+const blueMeter = document.querySelector<HTMLElement>("#blue-meter");
+const redSpecial = document.querySelector<HTMLElement>("#red-special");
+const blueSpecial = document.querySelector<HTMLElement>("#blue-special");
 const status = document.querySelector<HTMLElement>("#status");
 const redWins = document.querySelector<HTMLElement>("#red-wins");
 const blueWins = document.querySelector<HTMLElement>("#blue-wins");
@@ -37,18 +53,24 @@ const redName = document.querySelector<HTMLElement>("#red-name");
 const blueName = document.querySelector<HTMLElement>("#blue-name");
 const redStatus = document.querySelector<HTMLElement>("#red-status");
 const blueStatus = document.querySelector<HTMLElement>("#blue-status");
-const moveIndicator = document.querySelector<HTMLDivElement>("#move-indicator");
-const moveName = document.querySelector<HTMLElement>("#move-name");
-const moveMeterFill = document.querySelector<HTMLElement>("#move-meter-fill");
-const curieIndicator = document.querySelector<HTMLDivElement>("#curie-indicator");
-const curieMeterFill = document.querySelector<HTMLElement>("#curie-meter-fill");
+const redBanner = document.querySelector<HTMLElement>("#red-special-banner");
+const redBannerName = document.querySelector<HTMLElement>("#red-special-banner-name");
+const redBannerCaption = document.querySelector<HTMLElement>("#red-special-banner-caption");
+const blueBanner = document.querySelector<HTMLElement>("#blue-special-banner");
+const blueBannerName = document.querySelector<HTMLElement>("#blue-special-banner-name");
+const blueBannerCaption = document.querySelector<HTMLElement>("#blue-special-banner-caption");
+const superCardRoot = document.querySelector<HTMLElement>("#super-card");
+const superCardFighter = document.querySelector<HTMLElement>("#super-card-fighter");
+const superCardSpecial = document.querySelector<HTMLElement>("#super-card-special");
+const superCardCaption = document.querySelector<HTMLElement>("#super-card-caption");
+const superCardAnnouncement = document.querySelector<HTMLElement>("#super-card-announcement");
 const fighterSelect = document.querySelector<HTMLDialogElement>("#fighter-select");
 const fighterChoices = document.querySelector<HTMLFieldSetElement>("#fighter-choices");
+const fighterDetail = document.querySelector<HTMLElement>("#fighter-detail");
 const fighterSelectHelp = document.querySelector<HTMLElement>("#fighter-select-help");
-const selectWarburg = document.querySelector<HTMLInputElement>("#select-warburg");
-const selectCurie = document.querySelector<HTMLInputElement>("#select-curie");
 const startMatch = document.querySelector<HTMLButtonElement>("#start-match");
 const changeFighter = document.querySelector<HTMLButtonElement>("#change-fighter");
+const retryModelLoad = document.querySelector<HTMLButtonElement>("#retry-model-load");
 const franklinUnlockAnnouncement = document.querySelector<HTMLElement>(
   "#franklin-unlock-announcement",
 );
@@ -58,6 +80,10 @@ if (
   !canvas ||
   !redHealth ||
   !blueHealth ||
+  !redMeter ||
+  !blueMeter ||
+  !redSpecial ||
+  !blueSpecial ||
   !status ||
   !redWins ||
   !blueWins ||
@@ -65,18 +91,24 @@ if (
   !blueName ||
   !redStatus ||
   !blueStatus ||
-  !moveIndicator ||
-  !moveName ||
-  !moveMeterFill ||
-  !curieIndicator ||
-  !curieMeterFill ||
+  !redBanner ||
+  !redBannerName ||
+  !redBannerCaption ||
+  !blueBanner ||
+  !blueBannerName ||
+  !blueBannerCaption ||
+  !superCardRoot ||
+  !superCardFighter ||
+  !superCardSpecial ||
+  !superCardCaption ||
+  !superCardAnnouncement ||
   !fighterSelect ||
   !fighterChoices ||
+  !fighterDetail ||
   !fighterSelectHelp ||
-  !selectWarburg ||
-  !selectCurie ||
   !startMatch ||
   !changeFighter ||
+  !retryModelLoad ||
   !franklinUnlockAnnouncement ||
   !playerMoveHelp ||
   !gamepadMoveHelp
@@ -122,123 +154,114 @@ const centerMark = MeshBuilder.CreateBox(
 );
 centerMark.position.y = 0.012;
 centerMark.material = material("center-mark", new Color3(0.32, 0.39, 0.47));
-const oxygenCueMaterial = new StandardMaterial("oxygen-transfer-cue-material", scene);
-oxygenCueMaterial.diffuseColor = new Color3(1, 0.28, 0.2);
-oxygenCueMaterial.emissiveColor = new Color3(0.8, 0.09, 0.03);
-oxygenCueMaterial.disableLighting = true;
-const oxygenCue = MeshBuilder.CreateTorus(
-  "oxygen-transfer-impact-cue",
-  { diameter: 1.35, thickness: 0.07, tessellation: 32 },
-  scene,
-);
-oxygenCue.material = oxygenCueMaterial;
-oxygenCue.isPickable = false;
-oxygenCue.setEnabled(false);
-const outputCueMaterial = new StandardMaterial("aerobic-output-cue-material", scene);
-outputCueMaterial.diffuseColor = new Color3(0.3, 0.9, 0.78);
-outputCueMaterial.emissiveColor = new Color3(0.08, 0.62, 0.48);
-outputCueMaterial.disableLighting = true;
-outputCueMaterial.alpha = 0.55;
-const outputCue = MeshBuilder.CreateTorus(
-  "aerobic-output-cue",
-  { diameter: 2.0, thickness: 0.035, tessellation: 40 },
-  scene,
-);
-outputCue.rotation.x = Math.PI / 2;
-outputCue.material = outputCueMaterial;
-outputCue.isPickable = false;
-outputCue.setEnabled(false);
-const HIT_CUE_DURATION_SECONDS = 0.5;
-const HIT_CUE_CAMERA_OFFSET = 0.48;
-const hitImpactColor = new Color3(1, 0.78, 0.2);
-const blockImpactColor = new Color3(0.42, 0.82, 1);
-const hitImpactEmissiveColor = new Color3(1, 0.46, 0.06);
-const blockImpactEmissiveColor = new Color3(0.12, 0.55, 0.9);
-type HitCue = {
-  mesh: ReturnType<typeof MeshBuilder.CreateTorus>;
-  material: StandardMaterial;
-  kind: "hit" | "block" | null;
-  remaining: number;
-};
-function createHitCue(index: number): HitCue {
-  const cueMaterial = new StandardMaterial(`hit-impact-${index}-material`, scene);
-  cueMaterial.diffuseColor.copyFrom(hitImpactColor);
-  cueMaterial.emissiveColor.copyFrom(hitImpactEmissiveColor);
-  cueMaterial.disableLighting = true;
-  const mesh = MeshBuilder.CreateTorus(
-    `hit-impact-${index}`,
-    { diameter: 1.05, thickness: 0.14, tessellation: 24 },
-    scene,
-  );
-  mesh.material = cueMaterial;
-  mesh.isPickable = false;
-  mesh.setEnabled(false);
-  return { mesh, material: cueMaterial, kind: null as "hit" | "block" | null, remaining: 0 };
-}
-const hitCues = [createHitCue(0), createHitCue(1)] as const;
-function positionHitCue(cue: HitCue, fighter: Fighter): void {
-  cue.mesh.position.set(
-    fighter.x + Math.sin(cameraYaw) * HIT_CUE_CAMERA_OFFSET,
-    cue.kind === "block" ? 1.08 : 1.35,
-    fighter.z - Math.cos(cameraYaw) * HIT_CUE_CAMERA_OFFSET,
-  );
-  cue.mesh.rotation.x = Math.PI / 2;
-  cue.mesh.rotation.y = Math.PI - cameraYaw;
-}
-function beginHitCue(index: 0 | 1, fighter: Fighter): void {
-  const cue = index === 0 ? hitCues[0] : hitCues[1];
-  const blocked = fighter.state === "block";
-  cue.kind = blocked ? "block" : "hit";
-  cue.material.diffuseColor.copyFrom(blocked ? blockImpactColor : hitImpactColor);
-  cue.material.emissiveColor.copyFrom(blocked ? blockImpactEmissiveColor : hitImpactEmissiveColor);
-  cue.remaining = HIT_CUE_DURATION_SECONDS;
-  positionHitCue(cue, fighter);
-  cue.mesh.scaling.setAll(0.76);
-  cue.material.alpha = 1;
-  cue.mesh.setEnabled(true);
-}
-function updateHitCues(fighters: [Fighter, Fighter], frameSeconds: number): void {
-  for (const [index, cue] of hitCues.entries()) {
-    if (cue.remaining <= 0) {
-      cue.mesh.setEnabled(false);
-      continue;
-    }
-    const fighter = index === 0 ? fighters[0] : fighters[1];
-    const progress = cue.remaining / HIT_CUE_DURATION_SECONDS;
-    positionHitCue(cue, fighter);
-    cue.mesh.scaling.setAll(0.76 + (1 - progress) * 0.62);
-    cue.material.alpha = progress;
-    cue.remaining = Math.max(0, cue.remaining - frameSeconds);
+const arenaMark = material("arena-mark", new Color3(0.26, 0.32, 0.39));
+for (const x of [-7.6, 7.6]) {
+  for (const z of [-4.6, 0, 4.6]) {
+    const tick = MeshBuilder.CreateBox(
+      "arena-boundary-tick",
+      { width: 0.12, height: 0.012, depth: 0.7 },
+      scene,
+    );
+    tick.position.set(x, 0.014, z);
+    tick.material = arenaMark;
   }
 }
-let oxygenCueTicks = 0;
+const orbitMark = material("orbit-mark", new Color3(0.34, 0.41, 0.48));
+const orbit = MeshBuilder.CreateTorus(
+  "arena-orbit",
+  { diameter: 6.5, thickness: 0.075, tessellation: 64 },
+  scene,
+);
+orbit.position.y = 0.042;
+orbit.material = orbitMark;
+for (const [x, z, width, depth] of [
+  [0, -3.25, 0.72, 0.14],
+  [3.25, 0, 0.14, 0.72],
+  [0, 3.25, 0.72, 0.14],
+  [-3.25, 0, 0.14, 0.72],
+] as const) {
+  const calibration = MeshBuilder.CreateBox(
+    "arena-calibration-mark",
+    { width, height: 0.012, depth },
+    scene,
+  );
+  calibration.position.set(x, 0.018, z);
+  calibration.material = orbitMark;
+}
+const hitCues = new HitCues(scene);
+const specialVfx = new SpecialVfx(scene);
+const superCard = new SuperCard({
+  root: superCardRoot,
+  fighterName: superCardFighter,
+  specialName: superCardSpecial,
+  caption: superCardCaption,
+  announcement: superCardAnnouncement,
+});
 let previousHealth: [number, number] = [100, 100];
 
-let models: [RiggedFighterModel, RiggedFighterModel, RiggedFighterModel] | null = null;
+let models: [RiggedFighterModel, RiggedFighterModel] | null = null;
+let modelIds: [FighterId, FighterId] | null = null;
+let pendingModelPair: string | null = null;
+let failedModelPair: string | null = null;
+let modelLoadRevision = 0;
 const match = new Match();
+type SpecialBanner = {
+  root: HTMLElement;
+  name: HTMLElement;
+  caption: HTMLElement;
+  remaining: number;
+};
+const banners: [SpecialBanner, SpecialBanner] = [
+  { root: redBanner, name: redBannerName, caption: redBannerCaption, remaining: 0 },
+  { root: blueBanner, name: blueBannerName, caption: blueBannerCaption, remaining: 0 },
+];
+function presentSpecialReleases(): void {
+  for (const release of match.specialReleases) {
+    const fighter = match.fighters[release.owner];
+    if (!fighter) continue;
+    specialVfx.release(release, fighter);
+    const banner = banners[release.owner];
+    if (!banner) continue;
+    banner.name.textContent = release.special.name;
+    banner.caption.textContent = release.special.caption;
+    banner.remaining = 2.8;
+    banner.root.hidden = false;
+    if (release.tier === 3) superCard.present(fighterById(fighter.id).name, release.special);
+  }
+}
 function tickMatch(actions: [Action, Action]): void {
   const previousPhase = match.phase;
   match.tick(actions);
+  presentSpecialReleases();
   consumeCompletedMatchProgression(previousPhase);
 }
-void loadRiggedFighters(scene, (message) => {
-  status.textContent = message;
-})
-  .then((loaded) => {
-    models = loaded;
-    for (const model of loaded) {
-      for (const mesh of model.root.getChildMeshes()) {
-        if (mesh.getTotalVertices() > 0) shadowGenerator.addShadowCaster(mesh);
-      }
-    }
-  })
-  .catch((error: unknown) => {
-    status.textContent = error instanceof Error ? error.message : String(error);
-  });
 const debug =
   playtestMode() === "debug"
-    ? new DebugHarness(match, (previousPhase) => consumeCompletedMatchProgression(previousPhase))
+    ? new DebugHarness(match, (previousPhase) => {
+        presentSpecialReleases();
+        consumeCompletedMatchProgression(previousPhase);
+      })
     : null;
+function visibleModelBounds(model: RiggedFighterModel): {
+  min: { x: number; y: number; z: number };
+  max: { x: number; y: number; z: number };
+} | null {
+  const visibleMeshes = model.root
+    .getChildMeshes()
+    .filter((mesh) => mesh.getTotalVertices() > 0 && mesh.isEnabled(true));
+  if (!visibleMeshes.length) return null;
+  const bounds = model.root.getHierarchyBoundingVectors(
+    true,
+    (mesh) =>
+      typeof mesh.getTotalVertices === "function" &&
+      mesh.getTotalVertices() > 0 &&
+      mesh.isEnabled(true),
+  );
+  return {
+    min: { x: bounds.min.x, y: bounds.min.y, z: bounds.min.z },
+    max: { x: bounds.max.x, y: bounds.max.y, z: bounds.max.z },
+  };
+}
 installPlaytestProbe(
   match,
   engine,
@@ -250,260 +273,129 @@ installPlaytestProbe(
     pitch: cameraPitch,
     zoom: cameraZoom,
   }),
-  () => (models ? match.fighters.map((fighter) => modelForRole(fighter.role).snapshot()) : null),
   () => models?.map((model) => model.snapshot()) ?? null,
+  () =>
+    models?.map((model) => ({
+      ...model.snapshot(),
+      bounds: visibleModelBounds(model),
+    })) ?? null,
   () => ({
-    oxygen: {
-      enabled: oxygenCue.isEnabled(),
-      x: oxygenCue.position.x,
-      y: oxygenCue.position.y,
-      z: oxygenCue.position.z,
-    },
-    output: {
-      enabled: outputCue.isEnabled(),
-      x: outputCue.position.x,
-      y: outputCue.position.y,
-      z: outputCue.position.z,
-    },
-    impacts: hitCues.map((cue) => ({
-      enabled: cue.mesh.isEnabled(),
-      kind: cue.remaining > 0 ? cue.kind : null,
-      x: cue.mesh.position.x,
-      y: cue.mesh.position.y,
-      z: cue.mesh.position.z,
-      alpha: cue.material.alpha,
-    })),
+    impacts: hitCues.snapshots(),
+    activeSpecialEffects: specialVfx.activeCount,
   }),
   () => mapPlayerInput(keys, navigator.getGamepads?.()[0], cameraYaw),
 );
 const keys = new Set<string>();
-const startupUnlock = readFranklinUnlock();
-let unlockState: FranklinUnlockState = startupUnlock.state;
-let unlockProgressionAvailable = !startupUnlock.readFailed;
-let selectedRole: PlayerFighterRole = "warburg";
-let selectionConfirmed = debug !== null;
-let selectionHeld = { previous: false, next: false, confirm: false };
-let waitingForSelectionRelease = false;
-let franklinUnlockAnnounced = false;
-const fighterRoles = (): readonly PlayerFighterRole[] =>
-  unlockState.unlocked ? ["warburg", "curie", "franklin"] : ["warburg", "curie"];
-const isPlayerFighterRole = (value: string): value is PlayerFighterRole =>
-  value === "warburg" || value === "curie" || value === "franklin";
-const fighterChoice = (role: PlayerFighterRole): HTMLInputElement | null =>
-  fighterChoices.querySelector(`input[name="fighter"][value="${role}"]`);
-function createFranklinChoice(): HTMLLabelElement {
-  const label = document.createElement("label");
-  label.className = "fighter-choice";
-  label.htmlFor = "select-franklin";
-  const input = document.createElement("input");
-  input.id = "select-franklin";
-  input.name = "fighter";
-  input.type = "radio";
-  input.value = "franklin";
-  const description = document.createElement("span");
-  const name = document.createElement("strong");
-  name.textContent = "Rosalind Franklin";
-  const detail = document.createElement("small");
-  detail.textContent = "Precision timing and structural insight";
-  description.append(name, detail);
-  label.append(input, description);
-  return label;
+let restartHeld = false;
+let accumulator = 0;
+const startupProgress = readProgress();
+let progressState: ProgressState = startupProgress.state;
+let progressionAvailable = !startupProgress.readFailed;
+const availableFighterIds = (): readonly FighterId[] =>
+  (Object.keys(ROSTER) as FighterId[]).filter((id) => progressState.unlockedSet.has(id));
+function chooseOpponent(playerId: FighterId): FighterId {
+  const candidates = availableFighterIds().filter((id) => id !== playerId);
+  if (!candidates.length) throw new Error("No unlocked opponent is available.");
+  const index = Math.min(candidates.length - 1, Math.floor(opponentRandom() * candidates.length));
+  return candidates[index]!;
 }
-function renderFighterChoices(): void {
-  const franklinChoice = fighterChoice("franklin");
-  if (unlockState.unlocked && !franklinChoice) fighterChoices!.append(createFranklinChoice());
-  if (!unlockState.unlocked && franklinChoice) franklinChoice.closest("label")?.remove();
-  if (!fighterRoles().includes(selectedRole)) selectedRole = "warburg";
-  for (const role of fighterRoles()) {
-    const choice = fighterChoice(role);
-    if (choice) choice.checked = role === selectedRole;
-  }
-  const availableFighters = unlockState.unlocked
-    ? "Otto Heinrich Warburg, Marie Curie, or Rosalind Franklin"
-    : "Otto Heinrich Warburg or Marie Curie";
-  fighterSelectHelp!.textContent = `Select ${availableFighters}. The other fighter is controlled by the AI.`;
-}
-function decodedFranklinUnlock(value: unknown): FranklinUnlockState {
+function decodedProgress(value: unknown): ProgressState {
   try {
     const encoded = JSON.stringify(value);
-    return typeof encoded === "string" ? decodeFranklinUnlock(encoded) : lockedFranklinUnlock();
+    return typeof encoded === "string" ? decodeProgress(encoded) : starterProgress();
   } catch {
-    return lockedFranklinUnlock();
+    return starterProgress();
   }
 }
-function setInjectedFranklinUnlock(value: unknown): void {
-  unlockState = decodedFranklinUnlock(value);
-  renderFighterChoices();
+function setInjectedProgress(value: unknown): void {
+  progressState = decodedProgress(value);
+  fighterChooser.refresh();
 }
-/**
- * The match progression path calls this only after durable commit of the
- * decoded unlock record.
- * This seam deliberately has no storage dependency so post-commit behavior is
- * independently testable and cannot optimistically reveal Franklin.
- */
-function handleFranklinUnlockCommitted(value: unknown): void {
-  const committedState = decodedFranklinUnlock(value);
-  if (!committedState.unlocked) return;
-  unlockState = committedState;
-  renderFighterChoices();
-  if (franklinUnlockAnnounced) return;
-  franklinUnlockAnnounced = true;
-  franklinUnlockAnnouncement!.textContent = "Rosalind Franklin is now available.";
+function newlyUnlocked(previous: ProgressState, next: ProgressState): FighterId[] {
+  return [...next.unlockedSet].filter((id) => !previous.unlockedSet.has(id));
+}
+function announceUnlocked(ids: readonly FighterId[]): void {
+  if (!ids.length) return;
+  const names = ids.map((id) => fighterById(id).name);
+  franklinUnlockAnnouncement!.textContent =
+    names.length === 1
+      ? `${names[0]} is now available.`
+      : `${names.join(" and ")} are now available.`;
+}
+function handleCommittedProgress(next: ProgressState): void {
+  const added = newlyUnlocked(progressState, next);
+  progressState = next;
+  fighterChooser.refresh();
+  announceUnlocked(added);
 }
 function consumeCompletedMatchProgression(
   previousPhase: "fight" | "roundOver" | "matchOver",
 ): void {
-  const result = consumeCompletedNobelMatchWin(
+  const result = consumeCompletedPlayerMatchWin(
     {
       previousPhase,
       phase: match.phase,
       winner: match.winner,
-      playerRole: match.playerRole,
+      playerId: match.playerId,
     },
-    unlockState,
-    unlockProgressionAvailable,
-    (next) => writeFranklinUnlock(next).written,
+    progressState,
+    progressionAvailable,
+    (next) => writeProgress(next).written,
   );
-  unlockProgressionAvailable = result.progressionAvailable;
-  if (!result.committed) return;
-  unlockState = result.state;
-  if (result.state.unlocked) handleFranklinUnlockCommitted(result.state.record);
-}
-function updateControlsHelp(): void {
-  if (selectedRole === "warburg") {
-    playerMoveHelp!.textContent = [
-      "WASD move",
-      "J light",
-      "K Oxygen Transfer",
-      "L block",
-      "J+K Lactate Drive",
-      "J+L Aerobic Glycolysis",
-      "R restart",
-    ].join(" \u00b7 ");
-    gamepadMoveHelp!.textContent = [
-      "Gamepad: left stick/D-pad move",
-      "right stick view",
-      "south light",
-      "east Oxygen Transfer",
-      "south+east Lactate Drive",
-      "south+right shoulder Aerobic Glycolysis",
-      "right shoulder block",
-      "Start restart",
-    ].join(" \u00b7 ");
-  } else if (selectedRole === "curie") {
-    playerMoveHelp!.textContent = [
-      "WASD move",
-      "J light",
-      "K heavy knockdown",
-      "L block",
-      "J+L Separation Step",
-      "R restart",
-    ].join(" \u00b7 ");
-    gamepadMoveHelp!.textContent = [
-      "Gamepad: left stick/D-pad move",
-      "right stick view",
-      "south light",
-      "east heavy knockdown",
-      "south+right shoulder Separation Step",
-      "right shoulder block",
-      "Start restart",
-    ].join(" \u00b7 ");
-  } else {
-    playerMoveHelp!.textContent = [
-      "WASD move",
-      "J light",
-      "K heavy knockdown",
-      "L block",
-      "R restart",
-    ].join(" \u00b7 ");
-    gamepadMoveHelp!.textContent = [
-      "Gamepad: left stick/D-pad move",
-      "right stick view",
-      "south light",
-      "east heavy knockdown",
-      "right shoulder block",
-      "Start restart",
-    ].join(" \u00b7 ");
+  progressionAvailable = result.progressionAvailable;
+  if (!result.committed) {
+    if (!progressionAvailable) {
+      progressState = result.state;
+      fighterChooser.refresh();
+    }
+    return;
   }
+  handleCommittedProgress(result.state);
 }
-function setSelectedRole(role: PlayerFighterRole, focus = false): void {
-  if (!fighterRoles().includes(role)) return;
-  selectedRole = role;
-  renderFighterChoices();
-  updateControlsHelp();
-  if (focus) fighterChoice(role)?.focus();
-}
-function confirmSelection(): void {
-  if (selectionConfirmed) return;
-  selectionConfirmed = true;
-  waitingForSelectionRelease = true;
-  restartHeld = false;
-  match.selectPlayer(selectedRole);
-  fighterSelect!.close();
-  canvas!.focus();
-}
-function reopenFighterSelection(): void {
-  if (match.phase !== "matchOver") return;
-  if (!fighterRoles().includes(selectedRole)) selectedRole = "warburg";
-  renderFighterChoices();
-  updateControlsHelp();
-  selectionConfirmed = false;
-  selectionHeld = mapSelectionInput(keys, navigator.getGamepads?.()[0]);
-  waitingForSelectionRelease = false;
-  restartHeld = false;
-  accumulator = 0;
-  fighterSelect!.hidden = false;
-  fighterSelect!.showModal();
-  requestAnimationFrame(() => fighterChoice(selectedRole)?.focus());
-}
+playerMoveHelp.textContent = CONTROL_HELP.keyboard;
+gamepadMoveHelp.textContent = CONTROL_HELP.gamepad;
+const fighterChooser = new FighterChooser({
+  dialog: fighterSelect,
+  choices: fighterChoices,
+  detail: fighterDetail,
+  help: fighterSelectHelp,
+  start: startMatch,
+  change: changeFighter,
+  initiallyConfirmed: debug !== null,
+  availableIds: availableFighterIds,
+  currentInput: (): ReturnType<typeof mapSelectionInput> =>
+    mapSelectionInput(keys, navigator.getGamepads?.()[0]),
+  canReopen: (): boolean => match.phase === "matchOver",
+  onOpen: (): void => {
+    restartHeld = false;
+    accumulator = 0;
+  },
+  onConfirm: (id: FighterId): void => {
+    restartHeld = false;
+    match.selectPlayer(id, chooseOpponent(id));
+    canvas.focus();
+  },
+});
 function updateSelectionInput(): void {
-  if (selectionConfirmed) return;
-  const input = mapSelectionInput(keys, navigator.getGamepads?.()[0]);
-  const previous = input.previous && !input.next && !selectionHeld.previous;
-  const next = input.next && !input.previous && !selectionHeld.next;
-  const confirm = input.confirm && !selectionHeld.confirm;
-  selectionHeld = input;
-  const roles = fighterRoles();
-  const selectedIndex = roles.indexOf(selectedRole);
-  if (previous || next) {
-    const direction = next ? 1 : -1;
-    const index = selectedIndex < 0 ? 0 : selectedIndex;
-    setSelectedRole(roles[(index + direction + roles.length) % roles.length]!, true);
-  }
-  if (confirm) confirmSelection();
+  fighterChooser.update(mapSelectionInput(keys, navigator.getGamepads?.()[0]));
 }
-setSelectedRole("warburg");
-if (selectionConfirmed) fighterSelect.hidden = true;
+if (fighterChooser.isConfirmed) fighterSelect.hidden = true;
 else {
   fighterSelect.showModal();
-  requestAnimationFrame(() => selectWarburg.focus());
+  requestAnimationFrame(() => fighterChooser.focusSelected());
 }
-fighterSelect.addEventListener("cancel", (event) => event.preventDefault());
-fighterSelect.addEventListener("keydown", (event) => {
-  if (event.code !== "Tab") return;
-  const active = document.activeElement;
-  const onRadio = active instanceof HTMLInputElement && active.name === "fighter";
-  if (event.shiftKey && onRadio) {
-    event.preventDefault();
-    startMatch.focus();
-  } else if (!event.shiftKey && active === startMatch) {
-    event.preventDefault();
-    fighterChoice(selectedRole)?.focus();
-  }
-});
-fighterChoices.addEventListener("change", (event) => {
-  const choice = event.target;
-  if (!(choice instanceof HTMLInputElement) || !isPlayerFighterRole(choice.value)) return;
-  setSelectedRole(choice.value);
-});
-startMatch.addEventListener("click", confirmSelection);
-changeFighter.addEventListener("click", reopenFighterSelection);
 if (playtestMode()) {
-  Object.defineProperty(window, "__fightSetFranklinUnlock", {
-    value: (value: unknown): void => setInjectedFranklinUnlock(value),
+  Object.defineProperty(window, "__fightSetProgress", {
+    value: (value: unknown): void => setInjectedProgress(value),
   });
-  Object.defineProperty(window, "__fightCommitFranklinUnlock", {
-    value: (value: unknown): void => handleFranklinUnlockCommitted(value),
+  Object.defineProperty(window, "__fightCommitProgress", {
+    value: (value: unknown): void => handleCommittedProgress(decodedProgress(value)),
+  });
+}
+if (playtestMode() === "debug") {
+  Object.defineProperty(window, "__fightPreviewVfx", {
+    value: (shape: Parameters<SpecialVfx["preview"]>[0]): void =>
+      specialVfx.preview(shape, match.fighters[0]),
   });
 }
 let cameraYaw = 0;
@@ -552,6 +444,7 @@ window.addEventListener("keydown", (e) => {
       "KeyJ",
       "KeyK",
       "KeyL",
+      "KeyI",
       "KeyR",
       "KeyQ",
       "KeyE",
@@ -580,16 +473,14 @@ window.addEventListener("blur", () => {
 });
 document
   .querySelector<HTMLButtonElement>("#restart")
-  ?.addEventListener("click", () => match.restart());
-let restartHeld = false;
+  ?.addEventListener("click", () => restartMatch());
 function playerAction(): Action {
-  if (waitingForSelectionRelease) {
-    const selection = mapSelectionInput(keys, navigator.getGamepads?.()[0]);
-    if (selection.previous || selection.next || selection.confirm) return NEUTRAL;
-    waitingForSelectionRelease = false;
-  }
+  if (
+    fighterChooser.blockActionsUntilRelease(mapSelectionInput(keys, navigator.getGamepads?.()[0]))
+  )
+    return NEUTRAL;
   const frame = mapPlayerInput(keys, navigator.getGamepads?.()[0], cameraYaw);
-  if (frame.restart && !restartHeld) match.restart();
+  if (frame.restart && !restartHeld) restartMatch();
   restartHeld = frame.restart;
   return frame.action;
 }
@@ -597,83 +488,138 @@ const aiAction = createAi(aiRandom);
 function drawFighter(f: Fighter, model: RiggedFighterModel): void {
   model.root.position.set(f.x, 0, f.z);
   model.root.rotation.y = f.facing;
-  model.setFighterName(fighterName(f.role));
+  model.setFighterName(fighterById(f.id).name);
   model.update(f.state, f);
 }
-function modelForRole(role: Fighter["role"]): RiggedFighterModel {
-  if (!models) throw new Error("Rigged fighters are not loaded");
-  switch (role) {
-    case "warburg":
-      return models[0];
-    case "curie":
-    case "opponent":
-      return models[1];
-    case "franklin":
-      return models[2];
-  }
-}
-function fighterName(
-  role: Fighter["role"],
-): "Otto Heinrich Warburg" | "Marie Curie" | "Rosalind Franklin" {
-  switch (role) {
-    case "warburg":
-      return "Otto Heinrich Warburg";
-    case "curie":
-    case "opponent":
-      return "Marie Curie";
-    case "franklin":
-      return "Rosalind Franklin";
-  }
-}
-function fighterLabel(fighter: Fighter, index: number): string {
-  return `${fighterName(fighter.role)}${index === 1 ? " AI" : ""}`;
-}
 function hud(): void {
-  const [red, blue] = match.fighters;
-  const redLabel = fighterLabel(red, 0);
-  const blueLabel = fighterLabel(blue, 1);
-  redName!.textContent = redLabel.toUpperCase();
-  blueName!.textContent = blueLabel.toUpperCase();
-  redStatus!.setAttribute("aria-label", `${redLabel} status`);
-  blueStatus!.setAttribute("aria-label", `${blueLabel} status`);
-  redHealth!.style.width = red.hp + "%";
-  blueHealth!.style.width = blue.hp + "%";
-  redHealth!.parentElement?.setAttribute("aria-label", `${redLabel} health`);
-  blueHealth!.parentElement?.setAttribute("aria-label", `${blueLabel} health`);
-  redHealth!.parentElement?.setAttribute("aria-valuenow", String(red.hp));
-  blueHealth!.parentElement?.setAttribute("aria-valuenow", String(blue.hp));
-  redWins!.textContent = "Wins " + red.wins;
-  blueWins!.textContent = "Wins " + blue.wins;
-  const activeMoves = [red, blue]
-    .filter((fighter) => fighter.role === "warburg")
-    .flatMap((fighter) => [
-      fighter.state === "heavy" ? "OXYGEN TRANSFER" : "",
-      fighter.lactateDrive ? "LACTATE DRIVE" : "",
-      fighter.aerobicOutputTicks > 0 ? "AEROBIC GLYCOLYSIS" : "",
-    ])
-    .filter(Boolean);
-  moveName!.textContent = activeMoves.join("  +  ");
-  moveIndicator!.hidden = activeMoves.length === 0;
-  const warburg = [red, blue].find((fighter) => fighter.role === "warburg");
-  moveMeterFill!.style.width = `${((warburg?.aerobicOutputTicks ?? 0) / 72) * 100}%`;
-  const curie = [red, blue].find((fighter) => fighter.role === "curie" && fighter.separationStep);
-  curieIndicator!.hidden = !curie;
-  curieMeterFill!.style.width = `${curie ? ((24 - curie.ticks) / 24) * 100 : 0}%`;
-  const winner = match.winner === 1 ? blue : red;
-  const message =
-    match.phase === "fight"
-      ? "ROUND " + match.round
-      : match.phase === "roundOver"
-        ? `${fighterName(winner.role).toUpperCase()} KO!`
-        : `${fighterName(winner.role).toUpperCase()} WINS THE MATCH`;
-  if (status!.textContent !== message) status!.textContent = message;
+  renderHud(match, {
+    redName: redName!,
+    blueName: blueName!,
+    redStatus: redStatus!,
+    blueStatus: blueStatus!,
+    redHealth: redHealth!,
+    blueHealth: blueHealth!,
+    redMeter: redMeter!,
+    blueMeter: blueMeter!,
+    redSpecial: redSpecial!,
+    blueSpecial: blueSpecial!,
+    redWins: redWins!,
+    blueWins: blueWins!,
+    status: status!,
+  });
   changeFighter!.hidden = match.phase !== "matchOver";
 }
-let accumulator = 0;
 let last = performance.now();
+function resetPairPresentation(): void {
+  accumulator = 0;
+  last = performance.now();
+  for (const banner of banners) {
+    banner.remaining = 0;
+    banner.root.hidden = true;
+  }
+  superCard.dismiss();
+  previousHealth = match.fighters.map((fighter) => fighter.hp) as [number, number];
+}
+function samePair(first: readonly FighterId[], second: readonly FighterId[]): boolean {
+  return first[0] === second[0] && first[1] === second[1];
+}
+function hideModelLoadRetry(): void {
+  retryModelLoad!.hidden = true;
+}
+function clearModelLoadFailure(): void {
+  failedModelPair = null;
+  hideModelLoadRetry();
+}
+function disposeLoadedPair(): void {
+  for (const model of models ?? []) {
+    for (const mesh of model.root.getChildMeshes()) {
+      shadowGenerator.removeShadowCaster(mesh, false);
+    }
+    model.dispose();
+  }
+  models = null;
+  modelIds = null;
+}
+function loadCurrentPair(): void {
+  const [red, blue] = match.fighters;
+  const wanted: [FighterId, FighterId] = [red.id, blue.id];
+  if (models && modelIds && samePair(modelIds, wanted)) return;
+  if (models && modelIds && samePair(modelIds, [wanted[1], wanted[0]])) {
+    models = [models[1], models[0]];
+    modelIds = wanted;
+    resetPairPresentation();
+    return;
+  }
+
+  const key = `${wanted[0]}:${wanted[1]}`;
+  if (failedModelPair && failedModelPair !== key) clearModelLoadFailure();
+  if (pendingModelPair || failedModelPair === key) return;
+  const revision = ++modelLoadRevision;
+  pendingModelPair = key;
+  clearModelLoadFailure();
+  disposeLoadedPair();
+  resetPairPresentation();
+  status!.textContent = `Loading ${fighterById(wanted[0]).name} and ${fighterById(wanted[1]).name}...`;
+  void loadMatchFighters(scene, wanted[0], wanted[1], (message) => {
+    const [currentRed, currentBlue] = match.fighters;
+    if (revision === modelLoadRevision && samePair([currentRed.id, currentBlue.id], wanted))
+      status!.textContent = message;
+  })
+    .then((loaded) => {
+      if (revision !== modelLoadRevision) {
+        loaded.forEach((model) => model.dispose());
+        return;
+      }
+      const [currentRed, currentBlue] = match.fighters;
+      const currentPair: [FighterId, FighterId] = [currentRed.id, currentBlue.id];
+      if (!samePair(wanted, currentPair) && !samePair([wanted[1], wanted[0]], currentPair)) {
+        loaded.forEach((model) => model.dispose());
+        pendingModelPair = null;
+        return;
+      }
+      models = samePair(wanted, currentPair) ? loaded : [loaded[1], loaded[0]];
+      modelIds = currentPair;
+      for (const model of models) {
+        for (const mesh of model.root.getChildMeshes()) {
+          if (mesh.getTotalVertices() > 0) shadowGenerator.addShadowCaster(mesh);
+        }
+      }
+      pendingModelPair = null;
+      clearModelLoadFailure();
+      resetPairPresentation();
+    })
+    .catch(() => {
+      if (revision !== modelLoadRevision) return;
+      pendingModelPair = null;
+      const [currentRed, currentBlue] = match.fighters;
+      if (!samePair([currentRed.id, currentBlue.id], wanted)) return;
+      failedModelPair = key;
+      status!.textContent = "Could not load fighters. Retry to continue.";
+      retryModelLoad!.hidden = false;
+    });
+}
+retryModelLoad.addEventListener("click", () => {
+  const [red, blue] = match.fighters;
+  const key = `${red.id}:${blue.id}`;
+  if (failedModelPair !== key) return;
+  clearModelLoadFailure();
+  loadCurrentPair();
+});
+function restartMatch(): void {
+  clearModelLoadFailure();
+  match.restart();
+}
 engine.runRenderLoop(() => {
   const now = performance.now();
+  const [initialRed, initialBlue] = match.fighters;
+  const wanted: [FighterId, FighterId] = [initialRed.id, initialBlue.id];
+  loadCurrentPair();
   if (!models) {
+    last = now;
+    scene.render();
+    return;
+  }
+  if (!modelIds || !samePair(modelIds, wanted)) {
     last = now;
     scene.render();
     return;
@@ -704,59 +650,28 @@ engine.runRenderLoop(() => {
     1.5,
   );
   updateSelectionInput();
-  if (!selectionConfirmed) accumulator = 0;
-  while (!debug && selectionConfirmed && accumulator >= 1 / 60) {
+  if (!fighterChooser.isConfirmed) accumulator = 0;
+  while (!debug && fighterChooser.isConfirmed && accumulator >= 1 / 60) {
     tickMatch([playerAction(), aiAction(match)]);
     accumulator -= 1 / 60;
   }
   if (debug) accumulator = 0;
   const [red, blue] = match.fighters;
-  const redModel = modelForRole(red.role);
-  const blueModel = modelForRole(blue.role);
-  for (const model of models) {
-    const visible = model === redModel || model === blueModel;
-    if (model.root.isEnabled() !== visible) model.root.setEnabled(visible);
-  }
-  drawFighter(red, redModel);
-  drawFighter(blue, blueModel);
-  const warburgIndex = red.role === "warburg" ? 0 : blue.role === "warburg" ? 1 : null;
-  const warburg = warburgIndex === 0 ? red : warburgIndex === 1 ? blue : null;
-  const warburgTarget = warburgIndex === 0 ? blue : warburgIndex === 1 ? red : null;
-  const previousTargetHealth = warburgIndex === 0 ? previousHealth[1] : previousHealth[0];
-  if (
-    warburg &&
-    warburgTarget &&
-    warburg.state === "heavy" &&
-    warburgTarget.hp < previousTargetHealth
-  )
-    oxygenCueTicks = 12;
-  if (
-    match.phase === "fight" &&
-    match.round === 1 &&
-    red.hp === 100 &&
-    blue.hp === 100 &&
-    red.wins === 0 &&
-    blue.wins === 0
-  )
-    oxygenCueTicks = 0;
-  if (red.hp < previousHealth[0]) beginHitCue(0, red);
-  if (blue.hp < previousHealth[1]) beginHitCue(1, blue);
+  if (!models[0].root.isEnabled()) models[0].root.setEnabled(true);
+  if (!models[1].root.isEnabled()) models[1].root.setEnabled(true);
+  drawFighter(red, models[0]);
+  drawFighter(blue, models[1]);
+  if (red.hp < previousHealth[0]) hitCues.begin(0, red, cameraYaw);
+  if (blue.hp < previousHealth[1]) hitCues.begin(1, blue, cameraYaw);
   previousHealth = [red.hp, blue.hp];
-  updateHitCues([red, blue], frameSeconds);
-  if (oxygenCueTicks > 0) {
-    const progress = oxygenCueTicks / 12;
-    oxygenCue.position.set(warburgTarget?.x ?? 0, 1.35, warburgTarget?.z ?? 0);
-    oxygenCue.rotation.y = Math.PI - cameraYaw;
-    oxygenCue.scaling.setAll(1 + (1 - progress) * 0.18);
-    oxygenCueMaterial.alpha = 0.85 * progress;
-    oxygenCue.setEnabled(true);
-    oxygenCueTicks--;
-  } else {
-    oxygenCue.setEnabled(false);
+  hitCues.update([red, blue], cameraYaw, frameSeconds);
+  specialVfx.syncEffects(match.effects, match.fighters);
+  specialVfx.update(frameSeconds);
+  superCard.update(frameSeconds);
+  for (const banner of banners) {
+    banner.remaining = Math.max(0, banner.remaining - frameSeconds);
+    banner.root.hidden = banner.remaining === 0;
   }
-  outputCue.position.set(warburg?.x ?? 0, 0.045, warburg?.z ?? 0);
-  outputCue.scaling.setAll(0.85 + ((warburg?.aerobicOutputTicks ?? 0) / 72) * 0.15);
-  outputCue.setEnabled(Boolean(warburg && warburg.aerobicOutputTicks > 0));
   const mid = new Vector3((red.x + blue.x) / 2, 0.75, (red.z + blue.z) / 2);
   const separationX = red.x - blue.x;
   const separationZ = red.z - blue.z;
@@ -775,14 +690,10 @@ engine.runRenderLoop(() => {
   const cosYaw = Math.cos(cameraYaw);
   const sinPitch = Math.sin(cameraPitch);
   const cosPitch = Math.cos(cameraPitch);
-  // These dimensions conservatively cover the current vendored humans in any
-  // camera orbit. Their bind-pose GLB bounds have a maximum horizontal radius
-  // of 0.97 and a maximum height of 1.8 world units.
+  // This shared radius covers the current vendored bodies in any camera orbit;
+  // each fighter's measured height comes from the roster.
   const fighterRadius = 0.97;
-  const fighterTop = Math.max(
-    red.role === "warburg" ? 1.8 : 1.67,
-    blue.role === "warburg" ? 1.8 : 1.67,
-  );
+  const fighterTop = Math.max(fighterById(red.id).height, fighterById(blue.id).height);
   const sideSeparation = Math.abs(separationX * cosYaw + separationZ * sinYaw) / 2;
   const groundUpSeparation =
     Math.abs(-separationX * sinYaw + separationZ * cosYaw) * sinPitch * 0.5;

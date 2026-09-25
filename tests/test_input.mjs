@@ -14,8 +14,8 @@ const at = (...indices) =>
 const near = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 1e-10, message);
 
 test("keyboard and standard gamepad controls have action parity", () => {
-  const keyboard = mapPlayerInput(keys("KeyD", "KeyJ", "KeyK", "KeyL", "KeyR"), null, 0);
-  const gamepad = mapPlayerInput(new Set(), pad({ axes: [1, 0], buttons: at(0, 1, 5, 9) }), 0);
+  const keyboard = mapPlayerInput(keys("KeyD", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyR"), null, 0);
+  const gamepad = mapPlayerInput(new Set(), pad({ axes: [1, 0], buttons: at(0, 1, 3, 5, 9) }), 0);
   assert.deepEqual(gamepad, keyboard);
   assert.deepEqual(
     mapPlayerInput(keys("KeyW"), null, 0).action,
@@ -30,14 +30,9 @@ test("keyboard and standard gamepad controls have action parity", () => {
     mapPlayerInput(new Set(), pad({ buttons: at(13) }), 0).action,
   );
   assert.deepEqual(
-    mapPlayerInput(keys("KeyJ", "KeyK"), null, 0).action,
-    mapPlayerInput(new Set(), pad({ buttons: at(0, 1) }), 0).action,
-    "J+K and south+east must map to the same Lactate Drive chord",
-  );
-  assert.deepEqual(
-    mapPlayerInput(keys("KeyJ", "KeyL"), null, 0).action,
-    mapPlayerInput(new Set(), pad({ buttons: at(0, 5) }), 0).action,
-    "J+L and south+right-shoulder must map to the same Aerobic Glycolysis chord",
+    mapPlayerInput(keys("KeyI"), null, 0).action,
+    mapPlayerInput(new Set(), pad({ buttons: at(3) }), 0).action,
+    "I and standard gamepad button 3 must map to the same special action",
   );
 });
 
@@ -54,31 +49,55 @@ test("selection keyboard and standard gamepad navigation have parity", () => {
     mapSelectionInput(keys("KeyA"), null),
     mapSelectionInput(new Set(), pad({ axes: [-1] })),
   );
+  assert.deepEqual(
+    mapSelectionInput(keys("ArrowUp"), null),
+    mapSelectionInput(new Set(), pad({ axes: [0, -1], buttons: at(12) })),
+  );
+  assert.deepEqual(
+    mapSelectionInput(keys("ArrowDown"), null),
+    mapSelectionInput(new Set(), pad({ axes: [0, 1], buttons: at(13) })),
+  );
+  assert.deepEqual(
+    mapSelectionInput(keys("KeyI"), null),
+    mapSelectionInput(new Set(), pad({ buttons: at(3) })),
+  );
 });
 
 test("selection input ignores neutral, nonstandard, and invalid gamepad values", () => {
   assert.deepEqual(mapSelectionInput(new Set(), null), {
     previous: false,
     next: false,
+    up: false,
+    down: false,
+    profile: false,
     confirm: false,
   });
   assert.deepEqual(mapSelectionInput(new Set(), pad({ axes: [0.2] })), {
     previous: false,
     next: false,
+    up: false,
+    down: false,
+    profile: false,
     confirm: false,
   });
   assert.deepEqual(
     mapSelectionInput(new Set(), pad({ mapping: "", axes: [-1], buttons: at(0, 9, 14, 15) })),
-    { previous: false, next: false, confirm: false },
+    { previous: false, next: false, up: false, down: false, profile: false, confirm: false },
   );
   assert.deepEqual(mapSelectionInput(new Set(), pad({ axes: [Infinity], buttons: [] })), {
     previous: false,
     next: false,
+    up: false,
+    down: false,
+    profile: false,
     confirm: false,
   });
   assert.deepEqual(mapSelectionInput(keys("KeyA", "Enter"), pad({ axes: [Number.NaN] })), {
     previous: true,
     next: false,
+    up: false,
+    down: false,
+    profile: false,
     confirm: true,
   });
 });
@@ -94,7 +113,14 @@ test("movement is camera-relative, diagonal-normalized, and finite", () => {
     pad({ axes: [Infinity, Number.NaN] }),
     Number.NaN,
   ).action;
-  assert.deepEqual(invalid, { x: 0, z: 0, light: false, heavy: false, block: false });
+  assert.deepEqual(invalid, {
+    x: 0,
+    z: 0,
+    light: false,
+    heavy: false,
+    block: false,
+    special: false,
+  });
 });
 
 test("opposing, rapid, and unsupported input is safe", () => {
@@ -110,7 +136,7 @@ test("opposing, rapid, and unsupported input is safe", () => {
     0,
   );
   assert.deepEqual(unsupported, {
-    action: { x: 0, z: 0, light: false, heavy: false, block: false },
+    action: { x: 0, z: 0, light: false, heavy: false, block: false, special: false },
     restart: false,
   });
   const rapid = ["KeyW", "KeyD", "KeyS", "KeyA", "KeyW"];

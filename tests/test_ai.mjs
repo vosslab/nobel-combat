@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { createAi, createRandomSource } from "../src/ai.ts";
 import { Match, NEUTRAL } from "../src/match.ts";
+import { fighterById } from "../src/roster/roster.ts";
 
 function sequence(values) {
   let index = 0;
@@ -17,7 +18,8 @@ function actionIsBounded(action) {
     Math.abs(action.z) <= 1 &&
     typeof action.light === "boolean" &&
     typeof action.heavy === "boolean" &&
-    typeof action.block === "boolean"
+    typeof action.block === "boolean" &&
+    typeof action.special === "boolean"
   );
 }
 
@@ -51,8 +53,9 @@ test("AI approaches from maximum separation with bounded actions", () => {
 
 test("AI attack cadence uses one light or heavy action and then recovers", () => {
   const match = new Match();
-  match.fighters[0].x = -0.8;
-  match.fighters[1].x = 0.8;
+  match.selectPlayer("curie", "warburg");
+  match.fighters[0].x = -0.7;
+  match.fighters[1].x = 0.7;
   const ai = createAi(sequence([0.9, 0.1]));
 
   const light = ai(match);
@@ -84,67 +87,21 @@ test("AI blocks for a bounded reaction delay after taking damage", () => {
   assert.equal(ai(match).block, false);
 });
 
-test("role-aware AI activates existing Warburg and Curie moves", () => {
-  const warburgMatch = new Match();
-  warburgMatch.selectPlayer("curie");
-  warburgMatch.fighters[0].x = -1.8;
-  warburgMatch.fighters[1].x = 0.5;
-  const warburgAi = createAi(() => 0.9);
-  const lactateDrive = warburgAi(warburgMatch);
-  assert.deepEqual(
-    { light: lactateDrive.light, heavy: lactateDrive.heavy, block: lactateDrive.block },
-    { light: true, heavy: true, block: false },
-  );
-  warburgMatch.tick([NEUTRAL, lactateDrive]);
-  assert.equal(warburgMatch.fighters[1].lactateDrive, true);
-
-  const glycolysisMatch = new Match();
-  glycolysisMatch.selectPlayer("curie");
-  glycolysisMatch.fighters[0].x = -1.8;
-  glycolysisMatch.fighters[1].x = 0.8;
-  const glycolysisAi = createAi(() => 0.9);
-  const glycolysis = glycolysisAi(glycolysisMatch);
-  assert.deepEqual(
-    { light: glycolysis.light, heavy: glycolysis.heavy, block: glycolysis.block },
-    { light: true, heavy: false, block: true },
-  );
-  glycolysisMatch.tick([NEUTRAL, glycolysis]);
-  assert.equal(glycolysisMatch.fighters[1].aerobicOutputTicks, 72);
-  assert.equal(glycolysisMatch.fighters[1].aerobicLightReady, true);
-
-  const curieMatch = new Match();
-  curieMatch.selectPlayer("warburg");
-  curieMatch.fighters[0].x = -1.8;
-  curieMatch.fighters[1].x = 0;
-  const curieAi = createAi(() => 0.9);
-  const separationStep = curieAi(curieMatch);
-  assert.deepEqual(
-    { light: separationStep.light, heavy: separationStep.heavy, block: separationStep.block },
-    { light: true, heavy: false, block: true },
-  );
-  curieMatch.tick([NEUTRAL, separationStep]);
-  assert.equal(curieMatch.fighters[1].separationStep, true);
-});
-
-test("Warburg AI uses its powered-light window on its next attack", () => {
+test("AI releases a special when meter and range allow", () => {
   const match = new Match();
-  match.selectPlayer("curie");
-  match.fighters[0].x = -0.8;
-  match.fighters[1].x = 0.8;
-  match.fighters[1].aerobicOutputTicks = 12;
-  match.fighters[1].aerobicLightReady = true;
+  match.selectPlayer("curie", "warburg");
+  const [red, blue] = match.fighters;
+  const profile = fighterById(blue.id).ai;
+  blue.meter = 100;
+  red.x = blue.x - profile.specialRange[0] + 0.05;
   const ai = createAi(() => 0.9);
 
   const action = ai(match);
-  assert.deepEqual(
-    { light: action.light, heavy: action.heavy, block: action.block },
-    { light: true, heavy: false, block: false },
-  );
+  assert.equal(action.special, true);
+  assert.equal(action.light || action.heavy || action.block, false);
   match.tick([NEUTRAL, action]);
-  for (let tick = 0; tick < 8; tick++) match.tick([NEUTRAL, ai(match)]);
-
-  assert.equal(match.fighters[0].hp, 86);
-  assert.equal(match.fighters[1].aerobicLightReady, false);
+  assert.ok(blue.specialTicks > 0);
+  assert.equal(blue.meter, 0);
 });
 
 test("AI wins long seeded matches without unbounded or unexplained distant idle actions", () => {
@@ -164,7 +121,8 @@ test("AI wins long seeded matches without unbounded or unexplained distant idle 
       beforeDistance > 1.55 &&
       blue.state !== "hit" &&
       blue.state !== "down" &&
-      blue.state !== "getup"
+      blue.state !== "getup" &&
+      !action.special
     ) {
       distantIdleTicks += Number(action.x === 0 && action.z === 0);
     }

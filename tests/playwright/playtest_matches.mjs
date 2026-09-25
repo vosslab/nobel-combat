@@ -1,5 +1,7 @@
 import { chromium } from "playwright";
 
+// Chooser controls are in `src/index.html:94-110` and `src/ui/chooser.ts:297-304`;
+// live combat snapshots are installed by `src/playtest_probe.ts:59-78`.
 function readOption(name, fallback) {
   const position = process.argv.indexOf(name);
   if (position < 0) return fallback;
@@ -98,7 +100,7 @@ async function confirmFighter(page, device) {
     (roles) =>
       window
         .__fightSnapshot?.()
-        .fighters.map((fighter) => fighter.role)
+        .fighters.map((fighter) => fighter.id)
         .join(",") === roles.join(","),
     selectedRoles(),
   );
@@ -152,7 +154,7 @@ async function run(device, desired) {
     observed.add(blue.state);
     rounds.add(s.round);
     if (s.phase === "matchOver") break;
-    const action = { x: 0, z: 0, light: false, heavy: false, block: false };
+    const action = { x: 0, z: 0, light: false, heavy: false, block: false, special: false };
     if (desired === "red" && s.phase === "fight") {
       if (distance > 1.7) {
         action.x = Math.sign(blue.x - red.x);
@@ -175,7 +177,12 @@ async function run(device, desired) {
     await setInput(page, device, action, heldKeys);
     await page.waitForTimeout(70);
   }
-  await setInput(page, device, { x: 0, z: 0, light: false, heavy: false, block: false }, heldKeys);
+  await setInput(
+    page,
+    device,
+    { x: 0, z: 0, light: false, heavy: false, block: false, special: false },
+    heldKeys,
+  );
   if (device === "gamepad") {
     await page.evaluate(() => (window.__testPad.buttons[9].pressed = true));
     await page.waitForTimeout(120);
@@ -206,9 +213,9 @@ async function run(device, desired) {
       round: restarted.round,
       hp: restarted.fighters.map((f) => f.hp),
       wins: restarted.fighters.map((f) => f.wins),
-      roles: restarted.fighters.map((f) => f.role),
+      roles: restarted.fighters.map((f) => f.id),
     },
-    roles: s.fighters.map((f) => f.role),
+    roles: s.fighters.map((f) => f.id),
     errors,
   };
   results.push(result);
@@ -216,11 +223,11 @@ async function run(device, desired) {
   if (
     s.phase !== "matchOver" ||
     (s.winner !== 0 && s.winner !== 1) ||
-    s.fighters.map((f) => f.role).join(",") !== expectedRoles.join(",") ||
+    s.fighters.map((f) => f.id).join(",") !== expectedRoles.join(",") ||
     restarted.phase !== "fight" ||
     restarted.round !== 1 ||
     restarted.fighters.some((f) => f.hp !== 100 || f.wins !== 0) ||
-    restarted.fighters.map((f) => f.role).join(",") !== expectedRoles.join(",") ||
+    restarted.fighters.map((f) => f.id).join(",") !== expectedRoles.join(",") ||
     errors.length
   )
     failures++;

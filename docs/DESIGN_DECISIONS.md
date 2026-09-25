@@ -1,6 +1,7 @@
 # Design decisions
 
 <!-- VENDORED HEADER: START -->
+
 Record each durable decision about how this code and repository are shaped, once it is settled, with
 the reasoning a later reader needs. Guidance Neil Voss states belongs in
 [HUMAN_GUIDANCE.md](HUMAN_GUIDANCE.md), dated history in `docs/CHANGELOG.md`, open discussion in
@@ -62,24 +63,39 @@ the asset pipeline before the character-specific models were selected.
 the Warburg role and follows authoritative fighter state. A future model change repeats local-load,
 animation-state, and rendered-match checks.
 
-**Owner.** `src/rigged_fighter.ts`, `assets/README.md`, and
+**Owner.** `src/rig/loader.ts`, `src/rig/clips.ts`, `src/rig/presentation.ts`,
+`assets/README.md`, and
 [`docs/archive/first_nobel_fighter.md`](archive/first_nobel_fighter.md).
+
+### Rig loader retains source assets per scene
+
+**Decision.** Cache imported GLB containers by scene and URL, and instantiate only the active two
+fighters with independent skeletons, materials, and animation groups. Generate the shipped model
+manifest from unique roster body paths.
+
+**Why.** Match loading then scales with the two fighters in play rather than with the full roster,
+and mirror matches can use separate instances of the same cached source model.
+
+**Consequence.** Match changes dispose fighter instances and reuse cached source containers. The
+Pages build validates and copies the models named by the generated manifest.
+
+**Owner.** `src/rig/loader.ts`, `devel/write_model_manifest.mjs`, and `build_github_pages.sh`.
 
 ### Warburg's apparatus follows the existing rig
 
 **Decision.** Attach a small belt gauge and forearm manometer to Warburg's existing pelvis and arm
-transforms. Drive the gauge needle and iron-red flow pulse from the authoritative heavy-attack
-state and fixed simulation ticks.
+transforms. Drive the gauge needle and iron-red flow pulse only from an active special's authoritative
+`specialTicks`, never from its shared heavy pose.
 
 **Why.** The source dossier connects Warburg's visual signature to historical manometric methods.
 The two small apparatus details make Oxygen Transfer readable while reusing the current model and
 skeletal hierarchy.
 
 **Consequence.** The accessories are presentation-only. They do not supply collision geometry,
-affect Fighter state, or add animation timing. Browser captures verify attachment presence, attack
-progress, needle response, and reset after the move.
+affect Fighter state, or add animation timing. Browser captures verify attachment presence, ordinary
+heavy inactivity, special progress, needle response, and reset after the move.
 
-**Owner.** `src/rigged_fighter.ts` and `tests/playwright/capture_rig_states.mjs`.
+**Owner.** `src/rig/presentation.ts` and `tests/playwright/capture_rig_states.mjs`.
 
 ### Camera framing protects readable fighters
 
@@ -117,7 +133,7 @@ shadows ground the existing human models without changing their geometry or comb
 **Consequence.** The renderer owns one bounded shadow map for all local fighter assets, while disabled
 role models remain hidden. Browser state captures check the rendered path for all three fighter rigs.
 
-**Owner.** `src/main.ts`, `src/rigged_fighter.ts`, and the existing rig-state capture tests.
+**Owner.** `src/main.ts`, `src/rig/loader.ts`, and the existing rig-state capture tests.
 
 ### Hit feedback follows damage
 
@@ -150,151 +166,228 @@ second real fighter demonstrates a need for shared roster data. Attribute his 19
 the respiratory enzyme; describe tumor-metabolism and aerobic-glycolysis powers as game adaptations,
 not as the award citation or a cancer-treatment claim.
 
-Warburg's current concrete moves are Oxygen Transfer (faster, longer-reach heavy), Lactate Drive
-(a fixed-distance rush and jab), and Aerobic Glycolysis (a timed movement window and one powered
-ordinary light). The moves use existing attack inputs plus two explicit chords; they add no healing,
-stacking, or shared ability framework. Their exact tick values and test contracts are in the active
-plan and source dossier.
+**Superseded.** The roster's shared meter release supersedes the earlier fixed-input move rules.
+Warburg's three data-defined specials now use one Special input and the generic block scheduler;
+his tuned ordinary heavy remains in `FighterStats`.
 
 **Owner.** `docs/archive/first_nobel_fighter.md`, `docs/WARBURG_SOURCE_DOSSIER.md`, and
 the existing Match/rig boundaries.
 
-### Curie uses a period-dress rig
+### Nobel Combat is a fun, silly fighting game
 
-**Decision.** Present Marie Curie as the AI opponent with the vendored CC0 OpenGameArt `Old Lady`
-model, which has a long high-necked dress, gray updo, feminine face, and 84-joint rig. Retarget the
-existing local combat clips with Babylon.js `AnimatorAvatar` and one explicit asset-specific bone
-map. Rosalind Franklin continues to use the CC0 Mesh2Motion `female_9.glb` model and native clips.
+**Decision.** Make the game fun and silly, not an educational product. Riff on each scientist's
+real Nobel-related work so the attacks are recognizable; any attack outcome beyond the real work
+is openly game fiction.
 
-**Why.** The previous Curie model's contemporary clothing did not fit the historical character.
-OpenGameArt's CC0 `Old Lady` asset already provides a rigged period-style dress and an explicitly
-authored feminine face. Babylon supports animation-group retargeting across differently named rigs;
-the selected model's local animation map covers at least 50 joints in each combat clip. Automated
-captures exercise every current state without browser errors.
+**Why.** Scientific accuracy makes the humor land. A player might get curious and read more about
+a scientist, but teaching is not a product goal.
 
-**Consequence.** `Match` still identifies the blue fighter only as the existing `opponent` role and
-owns AI behavior, combat state, position, hit volumes, and timing. The visual layer identifies that
-opponent as Curie and retains an independent skeleton and animation groups. The model stays local;
-the single explicit map does not generalize the animation system.
+**Consequence.** Judge a design by whether it makes Nobel Combat more fun, distinctive, and absurd
+while keeping the scientific connection recognizable. Do not judge it by whether it teaches.
 
-**Owner.** `src/rigged_fighter.ts`, `src/main.ts`, `src/playtest_probe.ts`,
-`build_github_pages.sh`, `assets/README.md`, and the rig-boundary browser tests.
+**Owner.** The roster source material and the shared combat, presentation, and roster modules.
 
-### Curie uses a direct Separation Step rule
+### Fighter identity comes from roster data
 
-**Decision.** Add Curie's fictional Separation Step as a direct `Match` rule on the existing
-`light + block` chord. It has a fixed 24-tick attack, 18..12 active ticks, 1.95-unit reach,
-16/3 damage through ordinary/held block contact, 16 hit-stun ticks, and a 72-tick cooldown.
+**Decision.** Define each fighter's identity and combat choices in shared roster data: name,
+research-inspired verb, ordinary attack stats, specials, AI profile, unlock rule, and body.
 
-**Why.** Curie's documented chemical separations and activity measurements support a staged,
-timing-led metaphor. The bounded rule distinguishes her from Warburg without changing the
-authoritative combat model or creating an ability abstraction.
+**Why.** The planned 25-fighter game is a demonstrated need for shared roster data. Repeating
+identity checks across combat, AI, loading, and presentation would make the roster harder to extend.
 
-**Consequence.** Only the `curie` role receives the chord behavior. The direct rule keeps existing
-positions, geometry, one-hit guarding, block response, KO, round, restart, Warburg, and standard
-opponent contracts intact. It adds no movement, projectile, persistent resource, health effect, or
-special knockback behavior.
+**Consequence.** Runtime systems interpret generic fighter data and special blocks. Character-
+specific ideas remain welcome when their joke or fighting identity needs them, but they do not add
+fighter-id branches to shared runtime code. This supersedes the earlier decision to keep fighter
+rules explicit until a second real fighter demonstrated a need for shared data.
+
+**Owner.** `src/roster/`, the match and AI interpreters, and the rig loader.
+
+### Meter release selects a special tier
+
+**Decision.** Give each fighter a 0..300 meter. Apply each combat meter event to the fighter who
+caused or received that successful event, multiplied by that fighter's `meterGain` and capped at
+300: a landed hit gains 20, a blocked hit gains 8, taking a hit gains 12, and blocking gains 10.
+A rising `Action.special` press in `idle` or `move` releases tier `min(3, floor(meter / 100))` when
+the meter holds at least 100, then spends `tier * 100`. Preserve meter between rounds and reset it
+on restart or new fighter selection.
+
+**Why.** One bounded meter and one button give every roster fighter the same understandable special
+entry point while `meterGain` supplies a small data-owned balance lever. Rising-edge input prevents
+a held button from retriggering after recovery or a round transition.
+
+**Consequence.** The held-input state carries across a round transition. The HUD can derive the
+next special name from the affordable tier without owning combat state. M9 records tier selection
+and spend only; M10 consumes the selected special to run its pose and deterministic blocks/effects.
+
+**Owner.** `src/match.ts`, `src/input.ts`, `src/ui/hud.ts`, and
+`docs/active_plans/indexed-tumbling-quokka.md`.
+
+### Special effects use combat slots
+
+**Decision.** Model every released special as deterministic effects owned by a fighter slot. A
+release uses the authored pose and `ticks`, records `specialTicks`, and schedules its authored
+blocks; ordinary strikes cannot resolve during that lifecycle. Scheduled blocks honor delay and
+repeat. Projectiles expire on contact or range, zones expire on contact or duration, and shields
+and modifiers remain through their exact authored duration. Guard prevents contact unless a block
+sets `ignoresBlock`; a connected `onHit` activates its follow-on blocks. A shield counter schedules
+its follow-on blocks for the next simulation tick.
+
+**Why.** Slot ownership keeps effects tied to the two-fighter deterministic match model. The
+authored special schema already supplies pose, duration, timing, and blocks, so a separate ability
+runtime is unnecessary.
+
+**Consequence.** `Match` owns effect scheduling, activation, status aging, guard resolution, and
+KO cleanup. A KO clears active and pending effects before the next round or match-over state.
+
+**Owner.** `src/match.ts`, `src/specials.ts`, and `src/roster/fighter_def.ts`.
+
+### Persistent special visuals follow active effects
+
+**Decision.** Derive persistent special visuals from the active simulation effects. Effect records
+own projectile count, current position, and zone radius; the authored motif selects shared geometry.
+Keep visual indicator scale in presentation so it cannot change collision or duration.
+
+**Why.** Release-only shapes drift away from moving effects and obscure whether a zone or projectile
+is still active. Reading the simulation's current effects keeps the visuals synchronized while
+allowing their size and silhouette to stay legible in the arena.
+
+**Consequence.** `SpecialVfx` renders the current projectile, zone, and modifier records and caps a
+zone ring for screen legibility while `Match` retains its full gameplay radius. Motif-specific
+geometry remains generic and does not branch on fighter identity.
+
+**Owner.** `src/vfx.ts`, `src/specials.ts`, and `tests/test_vfx.mjs`.
+
+### Damage tracking records health loss
+
+**Decision.** Track each fighter's `damageTaken` for the current round as actual HP lost after
+defense and shield absorption. Healing does not reduce that value.
+
+**Why.** A `damageTaken`-scaled special needs a monotonic record of damage suffered in the round,
+rather than a measure that can change when health is restored.
+
+**Consequence.** Round reset creates new fighters and clears `damageTaken`; special damage can use
+the value through the authored `scaleWith` field without changing normal health or healing rules.
+
+**Owner.** `src/match.ts` and `src/roster/fighter_def.ts`.
+
+### Combat bodies use the canonical native rig
+
+**Decision.** Curie uses the local CC0 Mesh2Motion `female_31.glb` body and the shared native combat
+clips. Every registered body must retain the canonical ordered 66-joint Mesh2Motion skeleton, and
+the runtime clones clips directly onto those joints. Runtime cross-rig retarget maps are not a
+supported body path.
+
+**Why.** The attractive period-dress candidate uses a separately authored IK rig. Correct bone
+names and mapped ancestry established that channels could be addressed, but did not establish
+compatible bind pose, bone roll, or skin weights. Several joints—especially the leg controls—could
+not safely follow the combat clips. Removing the foot and toe channels reduced the spider-like pose
+in one capture, but did not establish a compatible deformation contract. The distinct gray-updo
+Mesh2Motion body preserves a recognizable mature scientist silhouette while using the proven
+combat skeleton.
+
+**Consequence.** Body variation is a data choice; animation compatibility is an asset contract.
+`tests/test_rig_boundary.mjs` checks every registered body against the canonical ordered skeleton
+and every combat clip against its complete joint set. A future model with a different rig must be
+authored to this skeleton and pass the same eight-state gate before registration. The retired
+period-dress GLB remains only as documented CC0 provenance.
+
+**Owner.** `src/roster/fighters_originals.ts`, `src/rig/clips.ts`, `src/rig/loader.ts`,
+`tests/test_rig_boundary.mjs`, `assets/models/MANIFEST.txt`, and `assets/README.md`.
+
+### Curie direct chord rule (superseded)
+
+**Decision.** This historical prototype used Curie's fictional Separation Step as a direct `Match`
+rule on the `light + block` chord.
+
+**Why.** Curie's documented chemical separations and activity measurements supported a staged,
+timing-led metaphor before the shared special schema existed.
+
+**Consequence.** The shared meter release and `SpecialDef` blocks supersede this direct rule. Curie
+now uses the same one-button, tiered-special contract as every fighter.
 
 **Owner.** `src/match.ts`, `src/debug_harness.ts`, `tests/test_match.mjs`, and
 `docs/CURIE_SOURCE_DOSSIER.md`.
 
-### Franklin is a player-only selectable role
+### Franklin player-only role (superseded)
 
-**Decision.** Add Rosalind Franklin as a player-selectable fighter paired with Warburg AI, while
-keeping `NobelFighterRole` limited to Warburg and Curie for unlock progression.
+**Decision.** The original Franklin prototype made her a player-only secret fighter paired with
+Warburg AI and limited unlock progression to Warburg and Curie.
 
 **Why.** Franklin was not a Nobel laureate. Her secret role is earned through wins as both existing
-Nobel fighters, and the two-slot match does not need opponent selection or roster infrastructure.
+Nobel fighters, which established an appropriate first unlock goal before the roster needed generic
+fighter selection.
 
-**Consequence.** `Match.selectPlayer("franklin")` always creates Franklin in slot 0 and Warburg in
-slot 1; round reset and restart preserve that pair. The existing `female_9` rig supplies the
-visual representation, with its display name resolved from the fighter role.
+**Consequence.** The generic roster and explicit `Match` pair supersede the fixed Franklin-Warburg
+pair. `main.ts` selects an opponent from the unlocked roster, excluding the selected player, and
+round reset and restart preserve that selected pair.
 
-**Owner.** `src/match.ts` and
+**Owner.** `src/roster/roster.ts`, `src/match.ts`, `src/main.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
-### Franklin unlock reduction stays separate from browser storage
+### Franklin v1 unlock flow (superseded)
 
-**Decision.** Keep the versioned Franklin win record reducer pure. The storage adapter in
-`src/franklin_storage.ts` owns reads and writes for
-`nobel-combat.franklin-unlock.v1`; the progression observer in `src/franklin_progression.ts` consumes a completed player
-Warburg or Curie match victory and exposes an unlock only after a changed durable write. Live match
-ticks and explicit `DebugHarness.tick` calls use the same edge observer; `DebugHarness.forceMatch`
-only sets a fixture snapshot and does not invoke it.
+**Decision.** The original Franklin prototype used a pure, versioned Franklin-specific win reducer
+with separate browser storage and a completed-player-match observer.
 
 **Why.** This preserves deterministic progression tests and keeps browser failures outside `Match`
-and the unlock calculation.
+and the unlock calculation. That boundary remains useful after the roster expanded.
 
-**Consequence.** `readFranklinUnlock` returns `{ state, readFailed }`; malformed records decode to
-locked and thrown reads set `readFailed` while keeping the game playable. `writeFranklinUnlock`
-returns `{ written }`; a failed write leaves Franklin hidden and emits no unlock announcement.
-Storage writes alone do not change the chooser or live region: the progression observer consumes
-successful changed writes before application state, chooser reveal, or the unlock-announcement
-handler. AI wins, round wins,
-restart, repeated render/tick calls, direct forced-phase fixtures, and Franklin matches add no
-progress. A debug tick that reaches a real player match-over edge uses the same observer, allowing
-the integration harness to validate idempotence after the already-recorded win. Startup, read, and
-write failures remain locked and playable. Browser tests cover durable reload and denied storage
-at the controller boundary. Both real full Nobel-win orders remain locked after
-the first win, unlock durably with one announcement after the second, and reload silently. The
-startup storage fixture covers denied reads; a denied write preserves the partial record, leaves the session
-locked, and produces no unlock or browser error.
+**Consequence.** The generic v2 progression contract supersedes the v1 Franklin reducer, storage
+key, and observer APIs. `decodeProgress` rejects malformed data to the starter state; `readProgress`
+and `writeProgress` isolate browser storage failures; and `consumeCompletedPlayerMatchWin` exposes
+newly unlocked roster fighters only after a successful durable write. The chooser and live region
+derive their state from that committed v2 result.
 
-**Owner.** `src/franklin_unlock.ts`, `src/franklin_storage.ts`, `src/franklin_progression.ts`,
-`src/debug_harness.ts`, the application controller in `src/main.ts`, and
+**Owner.** `src/progress/unlocks.ts`, `src/progress/storage.ts`, `src/progress/progression.ts`,
+`src/main.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
 ### Franklin reuses the authored female_9 presentation
 
-**Decision.** Use the locally vendored `female_9` rig for Franklin, resolve its display identity
-from `FighterRole`, and retain the asset's authored appearance without adding a Franklin palette.
+**Decision.** Use the locally vendored `female_9` rig for Franklin, resolve her display identity
+from the roster fighter id, and retain the asset's authored appearance without adding a Franklin
+palette.
 
-**Why.** Curie and Franklin are never concurrent in supported match pairs. Reusing the tested
-CC0 rig keeps the asset pipeline small while Warburg still receives an independent human rig.
+**Why.** Roster data may pair any two distinct unlocked fighters, including Curie and Franklin.
+Reusing the tested CC0 rig keeps the asset pipeline small, while the loader creates independent
+instances for each match slot.
 
-**Consequence.** The Franklin-versus-Warburg presentation has independent roots, skeletons,
-materials, and animation instances; all eight current combat states map to clips. A separate
-palette requires measurable visual evidence before it is added.
+**Consequence.** Every requested fighter pair, including pairs that reuse one source GLB, has
+independent roots, skeletons, materials, and animation instances; all eight current combat states
+use native cloned clips. A separate palette requires measurable visual evidence before it is added.
 
-**Owner.** `src/rigged_fighter.ts`, `src/main.ts`, and
+**Owner.** `src/roster/fighters_originals.ts`, `src/rig/loader.ts`, `src/rig/clips.ts`,
+`src/rig/presentation.ts`, `src/main.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
-### Franklin chooser derives fixture state through the strict decoder
+### Franklin chooser fixture decoder (superseded)
 
-**Decision.** Keep chooser browser fixtures at the same validation boundary as production progression:
-they serialize a candidate unlock record and create the native Franklin option only from
-`decodeFranklinUnlock`'s result.
+**Decision.** The original Franklin chooser fixtures decoded a Franklin-specific candidate unlock
+record before they exposed the secret fighter.
 
-**Why.** A raw unlocked object would bypass the strict record contract that F3 establishes. The
-decoder-backed fixture proves the chooser consumes the bounded locked/unlocked state while the
-storage adapter and progression observer retain ownership of browser storage.
+**Why.** A decoder-backed fixture preserves the production validation boundary and prevents a raw
+object from bypassing the bounded progression state.
 
-**Consequence.** Before a valid fixture record, the native chooser has exactly Warburg and Curie;
-after decoding a valid unlocked record, it creates Franklin after Curie. Keyboard, D-pad, and stick
-navigation use that dynamic order, and Franklin's help remains limited to her actual standard
-controls. `localStorage` and durable progression remain in the storage adapter and progression
-observer; the application calls the announcement handler only after a successful durable write.
+**Consequence.** `decodeProgress` now supplies the same generic v2 validation boundary for chooser
+fixtures and production. The chooser derives every available option from its decoded unlocked set;
+keyboard, D-pad, and stick navigation use that roster-derived order.
 
-**Owner.** `src/main.ts`, `src/franklin_unlock.ts`, and
+**Owner.** `src/progress/unlocks.ts`, `src/main.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
-### Franklin unlock presentation follows durable progress
+### Franklin v1 unlock presentation (superseded)
 
-**Decision.** Keep the post-commit unlock handler and match-over `Change fighter` route
-storage-free. The progression observer calls the handler only after a changed
-`localStorage.setItem` succeeds; the
-playtest-only hook that reaches it remains isolated to `playtestMode`.
+**Decision.** The original Franklin-specific post-commit unlock handler and match-over `Change
+fighter` route remained storage-free.
 
 **Why.** The interface can announce a newly durable unlock and reopen fighter selection without
-making UI code responsible for persistence or allowing a failed write to expose Franklin.
+making UI code responsible for persistence or allowing a failed write to expose a fighter.
 
-**Consequence.** A decoded already-unlocked record produces no announcement, a failed or unchanged
-write reaches no announcement handler, and `Change fighter` is available only at match-over. It preserves
-a valid current Curie or Franklin choice, otherwise falls back to Warburg, while combat stays paused
-until chooser confirmation.
+**Consequence.** The v2 progression edge now reports a durable committed state for any newly
+unlocked roster fighter. `main.ts` owns its announcement and the storage-free `Change fighter`
+route; an unsuccessful write leaves the current match playable without an unlock announcement.
 
-**Owner.** Application presentation in `src/main.ts`; durable storage and the post-write call site
-belong to `src/franklin_storage.ts` and `src/franklin_progression.ts` in
+**Owner.** `src/main.ts`, `src/progress/storage.ts`, and `src/progress/progression.ts` in
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
 ### Debug camera telemetry excludes intentional restart snaps
@@ -314,3 +407,79 @@ under-2.5-units-per-rendered-frame continuity check. Both paths preserve actiona
 **Owner.** `tests/playwright/agent_scenarios.mjs`,
 `tests/playwright/franklin_endurance.spec.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
+
+### Progress v2 starts without migration
+
+**Decision.** Store progression only under `nobel-combat.progress.v2` and do not import the
+short-lived v1 Franklin record.
+
+**Why.** The v1 key was introduced after the last Pages deployment, so no deployed player progress
+needs preservation. A generic record of fighter wins and total wins is the smaller durable contract
+for the expanding roster.
+
+**Consequence.** A v1 value is ignored and players begin with the roster starters until they earn
+new v2 progress. The chooser derives its available fighters from v2 unlock rules, and a successful
+player match win writes the v2 record before it exposes any newly unlocked fighter or announces it.
+
+**Owner.** `src/progress/unlocks.ts`, `src/progress/storage.ts`,
+`src/progress/progression.ts`, and `src/main.ts`.
+
+### Special release events carry their authored tier
+
+**Decision.** Include the released tier in the presentation-only `SpecialRelease` record.
+
+**Why.** Tier-three card behavior should follow the authored release event instead of inferring a
+tier from fighter or special identity.
+
+**Consequence.** The super card appears only for tier three, while the normal banner can present
+every release. The live match owns the event; the view never changes simulation timing or focus.
+
+**Owner.** `src/match.ts`, `src/ui/super_card.ts`, and `src/main.ts`.
+
+
+### Shared appearance kits use rigid accessories only
+
+**Decision.** Supersede the prior garment and hair allowances in `AppearanceKit`. Keep only rigid
+head and prop accessories: glasses, facial hair, and the manometer. Remove whole-body
+`clothingTint` and all generic garment geometry: lab coats, jackets, shirts/ties, and skirts.
+
+**Why.** Rendered cap, wave, cardigan, and skirt treatments lost attachment or silhouette coherence.
+The M22 two-slot captures found Goodenough's enlarged jacket unreadable as a dark suit and Buck's
+blue chest shell becoming an oval at the back or hip in twisted poses. These failures show that
+generic garment geometry cannot meet the full combat-pose contract.
+
+**Consequence.** Hair, clothes, and silhouette come from authored canonical-rig body assets. A Tier
+B fighter may use only the supported rigid accessories and must independently pass the source-cue,
+two-position, eight-state visual gate. McClintock's unsupported generic lab coat is removed and her
+appearance gate reopens.
+
+**Owner.** `src/roster/fighter_def.ts`, `src/rig/appearance_kit.ts`, and
+`tests/test_appearance_kit.mjs`.
+
+### Match owns an explicit fighter pair
+
+**Decision.** Store and validate both fighter ids on `Match`; let `main.ts` choose the opponent from
+the progression-derived unlocked set using its seeded random source.
+
+**Why.** Combat needs an explicit pair for reset, restart, and match setup. Opponent availability is
+application policy derived from player progress, so it belongs at the application boundary rather
+than inside combat rules.
+
+**Consequence.** Reset and restart preserve the selected pair. "Change fighter" selects a new
+eligible opponent, and playtests can reproduce picks with a fixed seed.
+
+**Owner.** `src/match.ts`, `src/main.ts`, and `tests/playwright/fighter_selection.spec.ts`.
+
+### Arena orientation stays quiet and presentation-only
+
+**Decision.** Use a floor-level center ring and muted boundary marks only as arena orientation
+details. They frame the playable court without affecting fighter state, collision, camera, HUD, or
+captions.
+
+**Why.** Fresh full-HUD captures from each idle slot perspective showed the floor ring improves the
+readability of the play space while remaining subordinate to the fighters and interface.
+
+**Consequence.** Keep arena markings low-profile, floor-bound, and presentation-only. Any future
+arena detail must retain ordinary combat readability in both roster slots before it is kept.
+
+**Owner.** `src/main.ts` and `tests/playwright/capture_rig_states.mjs`.

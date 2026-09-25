@@ -1,14 +1,23 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { FRANKLIN_UNLOCK_STORAGE_KEY } from "../../src/franklin_storage";
+import { PROGRESS_STORAGE_KEY } from "../../src/progress/storage";
+import { decodeProgress } from "../../src/progress/unlocks";
 
-// Selector contract: the unlock announcement, chooser radios, Begin match, and restart controls
-// come from src/index.html:52-98. Dynamic Franklin radio rendering and chooser role behavior come
-// from src/main.ts:294-323 and src/main.ts:430-475. Update this test when those UI contracts change.
+// Selector contract: the static chooser, unlock announcement, and restart controls come from
+// src/index.html. Dynamic fighter radios and chooser behavior come from src/ui/chooser.ts.
+// Update this test when those UI contracts change.
 test.describe.configure({ mode: "serial" });
 
-type Fighter = { role: string; x: number; z: number; hp: number; wins: number; state: string };
+type Fighter = { id: string; x: number; z: number; hp: number; wins: number; state: string };
 type Snapshot = { fighters: Fighter[]; phase: string; round: number; winner: number | null };
+
+function unlockedFighterCount(record: string | null): number {
+  return decodeProgress(record).unlockedSet.size;
+}
+
+async function expectUnlockedFighterCount(page: Page, record: string | null): Promise<void> {
+  await expect(page.locator('input[name="fighter"]')).toHaveCount(unlockedFighterCount(record));
+}
 
 const liveUrl = (baseURL: string): string => {
   const url = new URL(baseURL);
@@ -48,8 +57,8 @@ async function waitForReady(page: Page): Promise<void> {
   });
 }
 
-async function selectAndBegin(page: Page, role: "warburg" | "curie" = "warburg"): Promise<void> {
-  const name = role === "warburg" ? /Otto Heinrich Warburg/ : /Marie Curie/;
+async function selectAndBegin(page: Page, id: "warburg" | "curie" = "warburg"): Promise<void> {
+  const name = id === "warburg" ? /Otto Heinrich Warburg/ : /Marie Curie/;
   await page.getByRole("radio", { name }).check();
   await page.getByRole("button", { name: "Begin match" }).click();
 }
@@ -77,8 +86,8 @@ async function completeDebugWarburgWin(page: Page): Promise<void> {
       }
     ).__fightDebug;
     if (!debug) throw new Error("Deterministic match harness was unavailable.");
-    const neutral = { x: 0, z: 0, light: false, heavy: false, block: false };
-    const light = { x: 0, z: 0, light: true, heavy: false, block: false };
+    const neutral = { x: 0, z: 0, light: false, heavy: false, block: false, special: false };
+    const light = { x: 0, z: 0, light: true, heavy: false, block: false, special: false };
     debug.forceFighter(0, { x: -0.8, z: 0, hp: 100, state: "idle", ticks: 0, attackHeld: false });
     debug.forceFighter(1, { x: 0.8, z: 0, hp: 10, state: "idle", ticks: 0, attackHeld: false });
     debug.advance(8, [light, neutral]);
@@ -90,7 +99,7 @@ async function completeDebugWarburgWin(page: Page): Promise<void> {
 }
 
 async function storageRecord(page: Page): Promise<string | null> {
-  return page.evaluate((key) => localStorage.getItem(key), FRANKLIN_UNLOCK_STORAGE_KEY);
+  return page.evaluate((key) => localStorage.getItem(key), PROGRESS_STORAGE_KEY);
 }
 
 function observeErrors(page: Page): string[] {
@@ -102,7 +111,7 @@ function observeErrors(page: Page): string[] {
   return errors;
 }
 
-for (const initial of [null, '{"version":1,"wonRoles":["curie"]}'] as const) {
+for (const initial of [null, '{"version":2,"wonAs":["curie"],"wins":1}'] as const) {
   test(`a live AI victory keeps ${initial === null ? "locked" : "partial"} Nobel progress unchanged`, async ({
     page,
     baseURL,
@@ -114,7 +123,7 @@ for (const initial of [null, '{"version":1,"wonRoles":["curie"]}'] as const) {
       ({ key, record }) => {
         if (record !== null) localStorage.setItem(key, record);
       },
-      { key: FRANKLIN_UNLOCK_STORAGE_KEY, record: initial },
+      { key: PROGRESS_STORAGE_KEY, record: initial },
     );
     await page.goto(liveUrl(baseURL!));
     await waitForReady(page);
@@ -122,13 +131,13 @@ for (const initial of [null, '{"version":1,"wonRoles":["curie"]}'] as const) {
     await completeLiveAiWin(page);
 
     expect(await storageRecord(page)).toBe(initial);
-    await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+    await expectUnlockedFighterCount(page, initial);
     await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
     expect(errors).toEqual([]);
   });
 }
 
-test("an already recorded Nobel victory does not rewrite progress after combat match victory", async ({
+test("a repeated fighter win records the increased total after combat match victory", async ({
   page,
   baseURL,
 }) => {
@@ -136,7 +145,7 @@ test("an already recorded Nobel victory does not rewrite progress after combat m
   const errors = observeErrors(page);
   await installDeterministicRandom(page, 0x0f7b2001);
   await page.addInitScript((key) => {
-    localStorage.setItem(key, '{"version":1,"wonRoles":["warburg"]}');
+    localStorage.setItem(key, '{"version":2,"wonAs":["warburg"],"wins":1}');
     // eslint-disable-next-line @typescript-eslint/unbound-method -- retains the storage receiver below.
     const originalSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function (writtenKey, value): void {
@@ -146,7 +155,7 @@ test("an already recorded Nobel victory does not rewrite progress after combat m
       }
       originalSetItem.call(this, writtenKey, value);
     };
-  }, FRANKLIN_UNLOCK_STORAGE_KEY);
+  }, PROGRESS_STORAGE_KEY);
   const url = new URL(baseURL!);
   url.searchParams.set("debug", "1");
   await page.goto(url.toString());
@@ -154,11 +163,11 @@ test("an already recorded Nobel victory does not rewrite progress after combat m
   await completeDebugWarburgWin(page);
   expect(await snapshot(page)).toMatchObject({ phase: "matchOver", winner: 0, round: 2 });
 
-  expect(await storageRecord(page)).toBe('{"version":1,"wonRoles":["warburg"]}');
+  expect(await storageRecord(page)).toBe('{"version":2,"wonAs":["warburg"],"wins":2}');
   expect(await page.evaluate(() => document.documentElement.dataset.progressionWrites ?? "0")).toBe(
-    "0",
+    "1",
   );
-  await expect(page.locator('input[name="fighter"]')).toHaveCount(2);
+  await expectUnlockedFighterCount(page, '{"version":2,"wonAs":["warburg"],"wins":2}');
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   expect(errors).toEqual([]);
 });

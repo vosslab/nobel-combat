@@ -25,6 +25,21 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# Confirm the tracked shipped-model list matches the roster before the build
+# checks any source files or removes the previous dist/ output.
+node --import tsx devel/write_model_manifest.mjs --check
+
+while IFS= read -r model || [ -n "$model" ]; do
+	if [[ ! "$model" =~ ^assets/models/[a-z0-9_]+\.glb$ ]]; then
+		echo "ERROR: invalid model path in assets/models/MANIFEST.txt: $model" >&2
+		exit 1
+	fi
+	if [ ! -s "$model" ]; then
+		echo "ERROR: manifest model is missing or empty: $model" >&2
+		exit 1
+	fi
+done < assets/models/MANIFEST.txt
+
 # Resolve entry point.
 if [ -f "src/main.ts" ]; then
 	ENTRY="src/main.ts"
@@ -40,9 +55,6 @@ fi
 for required in \
 	src/index.html \
 	src/style.css \
-	assets/models/mesh2motion_doctor_m.glb \
-	assets/models/curie_period.glb \
-	assets/models/mesh2motion_female_9.glb \
 	assets/animations/mesh2motion_human_base.glb \
 	assets/animations/mesh2motion_human_addon.glb; do
 	if [ ! -f "$required" ]; then
@@ -83,18 +95,20 @@ npx esbuild "$ENTRY" \
 cp src/index.html dist/index.html
 cp src/style.css dist/style.css
 mkdir -p dist/assets/models dist/assets/animations
-cp assets/models/mesh2motion_doctor_m.glb dist/assets/models/
-cp assets/models/curie_period.glb dist/assets/models/
-cp assets/models/mesh2motion_female_9.glb dist/assets/models/
+while IFS= read -r model || [ -n "$model" ]; do
+	cp "$model" dist/assets/models/
+done < assets/models/MANIFEST.txt
+cp assets/models/MANIFEST.txt dist/assets/models/
 cp assets/animations/mesh2motion_human_base.glb dist/assets/animations/
 cp assets/animations/mesh2motion_human_addon.glb dist/assets/animations/
 touch dist/.nojekyll
 
 test -f dist/index.html
 test -f dist/main.js
-test -s dist/assets/models/mesh2motion_doctor_m.glb
-test -s dist/assets/models/curie_period.glb
-test -s dist/assets/models/mesh2motion_female_9.glb
+cmp assets/models/MANIFEST.txt dist/assets/models/MANIFEST.txt
+while IFS= read -r model || [ -n "$model" ]; do
+	test -s "dist/$model"
+done < assets/models/MANIFEST.txt
 test -s dist/assets/animations/mesh2motion_human_base.glb
 test -s dist/assets/animations/mesh2motion_human_addon.glb
 

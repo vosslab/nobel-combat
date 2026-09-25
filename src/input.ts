@@ -18,6 +18,9 @@ export type InputFrame = {
 export type SelectionInput = {
   previous: boolean;
   next: boolean;
+  up: boolean;
+  down: boolean;
+  profile: boolean;
   confirm: boolean;
 };
 
@@ -52,9 +55,13 @@ export function mapSelectionInput(
   gamepad: StandardGamepadInput | null | undefined,
 ): SelectionInput {
   const horizontal = axis(gamepad, 0);
+  const vertical = axis(gamepad, 1);
   return {
     previous: pressed(keys, "ArrowLeft", "KeyA") || buttonPressed(gamepad, 14) || horizontal < 0,
     next: pressed(keys, "ArrowRight", "KeyD") || buttonPressed(gamepad, 15) || horizontal > 0,
+    up: pressed(keys, "ArrowUp", "KeyW") || buttonPressed(gamepad, 12) || vertical < 0,
+    down: pressed(keys, "ArrowDown", "KeyS") || buttonPressed(gamepad, 13) || vertical > 0,
+    profile: pressed(keys, "KeyI") || buttonPressed(gamepad, 3),
     confirm:
       pressed(keys, "Enter", "Space") || buttonPressed(gamepad, 0) || buttonPressed(gamepad, 9),
   };
@@ -93,6 +100,7 @@ export function mapPlayerInput(
       light: pressed(keys, "KeyJ") || buttonPressed(gamepad, 0),
       heavy: pressed(keys, "KeyK") || buttonPressed(gamepad, 1),
       block: pressed(keys, "KeyL") || buttonPressed(gamepad, 5),
+      special: pressed(keys, "KeyI") || buttonPressed(gamepad, 3),
     },
     restart: pressed(keys, "KeyR") || buttonPressed(gamepad, 9),
   };

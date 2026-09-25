@@ -56,15 +56,27 @@ test("live keyboard and synthetic-gamepad traversal stays responsive and visible
   await runScenario(testInfo, "playtest_traversal.mjs", baseURL!);
 });
 
-test("capture Curie's and Franklin's eight rigged combat states", async ({ baseURL }, testInfo) => {
+test("capture Curie in both slots and Franklin's eight rigged combat states", async ({
+  baseURL,
+}, testInfo) => {
   test.setTimeout(90_000);
   await runScenario(testInfo, "capture_rig_states.mjs", baseURL!, [
     "--output-dir",
     "../../test-results/rig-states-curie-c9",
   ]);
   await runScenario(testInfo, "capture_rig_states.mjs", baseURL!, [
+    "--player",
+    "curie",
     "--opponent",
+    "warburg",
+    "--output-dir",
+    "../../test-results/rig-states-curie-player-c9",
+  ]);
+  await runScenario(testInfo, "capture_rig_states.mjs", baseURL!, [
+    "--player",
     "franklin",
+    "--opponent",
+    "warburg",
     "--output-dir",
     "../../test-results/rig-states-franklin-f4",
   ]);

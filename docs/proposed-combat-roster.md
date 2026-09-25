@@ -1,11 +1,11 @@
 # Proposed Nobel Combat Roster
 
-This document proposes additional playable fighters for **Nobel Combat**, a 3D fighting game in which Nobel laureates use 
+This document proposes additional playable fighters for **Nobel Combat**, a 3D fighting game in which Nobel laureates use
 exaggerated attacks inspired by their prize-winning research.
 
-**Modeling reference disclaimer:** Do not trust the character descriptions below as authoritative visual references. Before 
-modeling a character, do a web image search covering multiple periods of the laureate’s career. Choose a recognizable 
-appearance from their active scientific career, rather than automatically using their Nobel-ceremony or late-life 
+**Modeling reference disclaimer:** Do not trust the character descriptions below as authoritative visual references. Before
+modeling a character, do a web image search covering multiple periods of the laureate's career. Choose a recognizable
+appearance from their active scientific career, rather than automatically using their Nobel-ceremony or late-life
 appearance. Preserve distinctive features such as hairstyle, facial hair, glasses, build, and typical clothing.
 
 ## Character design principles
@@ -192,11 +192,11 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 ---
 
-## Katalin Karikó
+## Katalin Kariko
 
 **Nobel Prize:** Physiology or Medicine, 2023, discoveries concerning nucleoside base modifications that enabled effective mRNA vaccines.
 
-**Modeling reference:** Karikó in her 40s to 50s. Approximately 5'5" modeling height. Slim build. Short blonde hair. Laboratory coat or simple professional academic clothing.
+**Modeling reference:** Kariko in her 40s to 50s. Approximately 5'5" modeling height. Slim build. Short blonde hair. Laboratory coat or simple professional academic clothing.
 
 **Combat style:** Delivers modified mRNA that temporarily changes cellular protein production.
 
@@ -209,7 +209,7 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
    Launches spherical delivery particles containing mRNA payloads.
 
 3. **mRNA Translation**
-   Delivered mRNA hijacks the opponent's ribosomes, forcing their cells to manufacture Karikó's selected combat protein.
+   Delivered mRNA hijacks the opponent's ribosomes, forcing their cells to manufacture Kariko's selected combat protein.
 
 ---
 
@@ -257,9 +257,9 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 ## David Baltimore
 
-**Nobel Prize:** Physiology or Medicine, 1975, discoveries concerning interactions between tumor viruses and cellular genetic material.
+**Nobel Prize:** Physiology or Medicine, 1975, discoveries concerning the interaction between tumour viruses and the genetic material of the cell. ([Nobel Prize](https://www.nobelprize.org/prizes/medicine/1975/baltimore/facts/))
 
-**Modeling reference:** Baltimore in his late 30s to early 40s. Approximately 5'9" modeling height. Slim build. Dark hair with prominent sideburns appropriate to the 1970s. Glasses. Shirt, tie, or period laboratory clothing.
+**Modeling reference:** Use the 1975 portrait period: dark hair swept back with prominent sideburns, rectangular metal-frame glasses, a full dark beard and mustache, dark jacket, light shirt, and patterned tie. The reference is an upper-torso portrait, so height and build are unspecified.
 
 **Combat style:** Retroviral information flow.
 
@@ -370,7 +370,7 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 **Nobel Prize:** Chemistry, 2008, discovery and development of green fluorescent protein. Tsien developed GFP variants with improved fluorescence and a palette of different colors. ([National Inventors Hall of Fame](https://www.invent.org/inductees/roger-tsien?utm_source=chatgpt.com))
 
-**Modeling reference:** Tsien in his 40s to early 50s. Approximately 5'9" modeling height. Average build. Dark hair becoming gray. Glasses. Casual academic clothing.
+**Modeling reference:** Use 2008 as the primary period and 2012 as corroboration. Short salt-and-pepper hair with gray temples, a high forehead, thin oval wire-frame glasses, and a clean-shaven narrow oval face. The 2008 reference supports a dark jacket, light small-check shirt, and narrow dark tie. No full-body estimate is available.
 
 **Combat style:** Fluorescence, calcium signaling, and color.
 
@@ -391,7 +391,7 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 **Nobel Prize:** Physics, 1971, invention and development of the holographic method.
 
-**Modeling reference:** Gabor in his 50s to 60s. Approximately 5'8" modeling height. Slim build. Receding dark-gray hair. Glasses. Mid-century suit or laboratory coat.
+**Modeling reference:** Use the 1967 active-career period. A large bald crown with short darker side and back hair, full gray mustache, broad dark browline glasses, and a light-to-medium textured suit with white shirt and patterned tie. The available photographs do not establish full-body build or height.
 
 **Combat style:** Holograms and wavefront reconstruction.
 
@@ -414,7 +414,7 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 **Nobel Prize:** Chemistry, 2019, development of lithium-ion batteries. Goodenough developed a cobalt-oxide cathode that enabled substantially higher-voltage lithium batteries. ([Nobel Prize](https://www.nobelprize.org/prizes/chemistry/2019/goodenough/facts/?utm_source=chatgpt.com))
 
-**Modeling reference:** Goodenough in his 50s to 60s rather than at age 97 when he received the Nobel. Approximately 5'10" modeling height. Lean build. Short gray hair. Glasses. Conservative shirt, tie, and jacket or laboratory coat.
+**Modeling reference:** Use the January 1964 MIT Lincoln Laboratory group photograph. Its evidence supports short dark neatly parted hair, a dark suit, white shirt, and dark tie. The group image does not reliably establish facial detail, glasses, height, or build.
 
 **Combat style:** Stores energy and releases it at high voltage.
 
@@ -435,7 +435,7 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 **Nobel Prize:** Physics, 2018, chirped pulse amplification.
 
-**Modeling reference:** Strickland in her 30s to early 40s, close to the period of the original CPA work. Approximately 5'5" modeling height. Slim build. Curly brown hair. Glasses. Practical 1980s laboratory clothing.
+**Modeling reference:** Use the 1985 doctoral-research period associated with the original CPA work: short dark hair, large dark rectangular glasses, and practical laboratory knitwear. The reference does not support curly hair, height, or build.
 
 **Combat style:** Laser pulses that are stretched, amplified, and compressed.
 
@@ -456,7 +456,7 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 **Nobel Prizes:** Physics, 1956 and 1972, for the transistor and the theory of superconductivity.
 
-**Modeling reference:** Bardeen around 1956. Moderate height and solid build, with thinning dark hair, thick plain glasses, inexpensive blue suit, white shirt, and conservative tie. These details are unusually well documented in a National Academies biography. ([National Academies](https://www.nationalacademies.org/read/10372/chapter/2?utm_source=chatgpt.com))
+**Modeling reference:** Use the 1956 period: receding dark hair, round glasses, a dark or neutral suit, white shirt, and striped tie. The period portrait does not establish height or build; it does not support unusually thick glasses or a blue suit.
 
 **Combat style:** Two completely different Nobel-powered modes: semiconductor electronics and superconductivity.
 
@@ -477,7 +477,7 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 **Nobel Prize:** Chemistry, 1971, electronic structure and geometry of molecules, particularly free radicals, through molecular spectroscopy.
 
-**Modeling reference:** Herzberg in his 40s to 50s. Approximately 5'9" modeling height. Slim build. Receding dark hair. Glasses. Suit, tie, or laboratory coat.
+**Modeling reference:** Use the circa-1950 spectroscopy period: slicked dark hair with a high or receding hairline, clean-shaven face, and a white lab coat over vest and tie. In the principal laboratory reference, Herzberg holds glasses in one hand rather than wearing them. The crop does not establish height or build.
 
 **Combat style:** Molecular spectra become physical weapons.
 
@@ -494,23 +494,10 @@ Special attacks should be ridiculous but scientifically recognizable. Ideally, a
 
 ---
 
-# Molecular Medicine
+# Cross-category references
 
-## David Baltimore
-
-See Genetics and Molecular Biology above.
-
----
-
-# Additional RNA and Protein Fighters
-
-## Thomas Cech
-
-See Genetics and Molecular Biology above.
-
-## Sidney Altman
-
-See Genetics and Molecular Biology above.
+David Baltimore, Thomas Cech, and Sidney Altman also fit molecular medicine and RNA groupings.
+Their single roster entries appear under Genetics and Molecular Biology above.
 
 ---
 
@@ -520,6 +507,6 @@ The strongest candidates are not necessarily the most famous scientists. Priorit
 
 The roster should avoid having every molecular biologist simply fire differently colored molecular projectiles. Each character should instead have a recognizable verb:
 
-**Baker designs. Steitz translates. Frank reconstructs. Hodgkin diffracts. Doudna edits. Bertozzi clicks. McClintock transposes. Levi-Montalcini grows. Blackburn extends. Karikó delivers. Tsien fluoresces. Goodenough charges. Strickland amplifies. Sharpless reacts. Buck smells. Bardeen conducts. Altman catalyzes. Cech splices. Baltimore reverses. Anfinsen folds. Herzberg excites. Gabor reconstructs wavefronts.**
+**Baker designs. Steitz translates. Frank reconstructs. Hodgkin diffracts. Doudna edits. Bertozzi clicks. McClintock transposes. Levi-Montalcini grows. Blackburn extends. Kariko delivers. Tsien fluoresces. Goodenough charges. Strickland amplifies. Sharpless reacts. Buck smells. Bardeen conducts. Altman catalyzes. Cech splices. Baltimore reverses. Anfinsen folds. Herzberg excites. Gabor reconstructs wavefronts.**
 
 That distinction should drive animation, VFX, AI behavior, and fighting style as much as the individual attacks.

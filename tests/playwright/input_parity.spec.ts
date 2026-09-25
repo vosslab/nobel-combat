@@ -4,7 +4,14 @@ import type { Page } from "@playwright/test";
 // Selector contract: src/playtest_probe.ts exposes __fightSnapshot only on localhost
 // with ?debug=1; src/input.ts maps these keyboard and standard-gamepad controls.
 type InputFrame = {
-  action: { x: number; z: number; light: boolean; heavy: boolean; block: boolean };
+  action: {
+    x: number;
+    z: number;
+    light: boolean;
+    heavy: boolean;
+    block: boolean;
+    special: boolean;
+  };
   restart: boolean;
 };
 
@@ -42,9 +49,8 @@ const actionCases: InputCase[] = [
   { label: "backward-left diagonal", keys: ["KeyS", "KeyA"], pad: pad([-1, 1, 0, 0]) },
   { label: "light", keys: ["KeyJ"], pad: pad(undefined, [0]) },
   { label: "heavy", keys: ["KeyK"], pad: pad(undefined, [1]) },
+  { label: "special", keys: ["KeyI"], pad: pad(undefined, [3]) },
   { label: "block", keys: ["KeyL"], pad: pad(undefined, [5]) },
-  { label: "Lactate Drive", keys: ["KeyJ", "KeyK"], pad: pad(undefined, [0, 1]) },
-  { label: "Aerobic Glycolysis", keys: ["KeyJ", "KeyL"], pad: pad(undefined, [0, 5]) },
   { label: "restart", keys: ["KeyR"], pad: pad(undefined, [9]) },
   {
     label: "light-heavy-block",
@@ -189,10 +195,10 @@ test("keyboard and standard gamepad input frames remain identical after camera o
   ];
   for (const input of rapidSwitches) await expectSameFrame(page, input);
 
-  const nonstandard = pad([1, -1, 0, 0], [0, 1, 5, 9]);
+  const nonstandard = pad([1, -1, 0, 0], [0, 1, 3, 5, 9]);
   nonstandard.mapping = "";
   expect(await gamepadFrame(page, nonstandard)).toEqual({
-    action: { x: 0, z: 0, light: false, heavy: false, block: false },
+    action: { x: 0, z: 0, light: false, heavy: false, block: false, special: false },
     restart: false,
   });
   expect(errors).toEqual([]);
