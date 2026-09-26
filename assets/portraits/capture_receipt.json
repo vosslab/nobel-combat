@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:4223/",
+  "url": "http://127.0.0.1:8176/",
   "receipts": [
     {
       "fighterId": "warburg",
@@ -354,6 +354,36 @@
         {
           "fighterId": "donna_strickland",
           "sha256": "b5cf7cea7644c1a5409d46b27dd748f110171534d796649307d180705520b02e"
+        },
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        }
+      ]
+    },
+    {
+      "fighterId": "k_barry_sharpless",
+      "body": "assets/models/mesh2motion_sharpless_2018.glb",
+      "bodySha256": "5280bd322a7395e3a91e33a5cc181dff538af0252d0f1030afc1ae862dc0d93f",
+      "comparisonId": "warburg",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 224,
+        "width": 170,
+        "height": 170
+      },
+      "image": "sharpless.png",
+      "imageSha256": "08ea297622790b46a02a655d5eea2a0d8e6336b19c6b34654c1ff0922e6899d5",
+      "servedBodySha256": [
+        {
+          "fighterId": "k_barry_sharpless",
+          "sha256": "5280bd322a7395e3a91e33a5cc181dff538af0252d0f1030afc1ae862dc0d93f"
         },
         {
           "fighterId": "warburg",

@@ -694,18 +694,26 @@ candidate handoff.
 
 ### Roster identity uses gameplay-scale caricatures
 
-**Decision.** Use an existing coherent human donor with a small set of distinguishing cues as the
-default character-production route. Treat Curie and Warburg as the fidelity reference. Use
-photo-to-3D, generated heads, or grafts only as bounded comparisons when that route fails at normal
-gameplay scale.
+**Decision.** Keep a coherent human donor with a small set of source-supported cues as the default
+character-production route, with Curie and Warburg as the fidelity reference. Require each fighter's
+visible face to read as distinct from every current roster face at the same gameplay scale when hair,
+glasses, clothing, accessories, silhouette, and donor choice are disregarded. This is a caricature
+identity check, not a portrait-likeness requirement.
 
-**Why.** The product needs 25 distinct, fun fighters, and extra head geometry can obscure the cues
-that make a character readable. Portrait reconstruction has not demonstrated enough value to be the
-default cost for each lane.
+**Why.** The 2026-09-26 audit found that five of twelve registered fighters use byte-identical face
+atlases, and Franklin, Buck, and Bertozzi still read as one face in the roster contact sheet after
+supporting appearance cues are set aside. Direct photo-to-atlas experiments on unchanged donor
+geometry made the source face visible but produced stretched, patch-like renders. A simple painted
+brow, eye, cheek, and crease pass looked cleaner but still read as the same donor face. The evidence
+shows that donor choice and accessories alone are insufficient, without establishing one texture
+method as the production answer.
 
-**Consequence.** Face shape and hair remain the first identity cues, but paused close views diagnose
-broken geometry and placement rather than demanding portrait likeness. A candidate can proceed when
-its ordinary game view is recognizable, coherent, and rig-correct; elaborate experiments must show
-a visible gameplay improvement over the cleaned-up donor.
+**Consequence.** Review every candidate beside the current roster on a same-scale contact sheet,
+including a central-face view. Face shape, brow and eye region, complexion, age cues, cheeks, and
+facial hair can establish distinction; hair and other appearance cues can reinforce it but cannot
+replace it. A face-texture edit may be tested on one unchanged donor at a time, but must pass the same
+roster review before integration. Existing per-fighter model assets already contain their own face
+atlas, so no generalized face-generation runtime is added without further evidence.
 
-**Owner.** `docs/NEW_CHARACTER_RECIPE.md` and the active roster-expansion plan.
+**Owner.** `docs/NEW_CHARACTER_RECIPE.md`, the active roster-expansion plan, and the
+[portrait-texture experiment report](active_plans/reports/portrait_texture_experiment.md).

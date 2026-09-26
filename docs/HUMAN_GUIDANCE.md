@@ -30,7 +30,8 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
 - Use the Pause/Resume button, P, or Space to freeze a useful combat pose for screenshots. Keep
   orbit, tilt, and zoom controls available while the fighters are paused.
 - Capture deterministic state screenshots as artifacts and validate asset load, skeletons, animation
-  selection, and browser behavior automatically; human visual approval is not a completion gate.
+  selection, and browser behavior automatically. Judge face identity separately from a current-roster
+  contact sheet at the same scale.
 - Otto Heinrich Warburg is the signature and deliberately strongest fighter, with powers based on
   cellular respiration, tumor metabolism, and the Warburg effect. Rosalind Franklin is a secret
   unlockable fighter.
@@ -53,7 +54,8 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
   appearance cues in the source dossier.
 - Reuse some adult CC0 bodies with appearance kits and give other fighters uniquely selected
   CC0 bodies. Keep visual meshes separate from authoritative combat state and hit geometry.
-- Keep roster implementation and automated acceptance free of human-dependent completion gates.
+- Keep runtime, rig, match, and browser acceptance automated and free of human-dependent completion
+  gates. Use the current-roster contact sheet for the separate subjective face-identity check.
 - Keep `docs/proposed-combat-roster.md` as the temporary roster filename. Publish the implemented
   roster as `docs/ACTIVE_COMBAT_ROSTER.md` when it is complete.
 - Fix the design that allowed incorrect behavior. Use a narrow fallback or special case only when
@@ -76,6 +78,10 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
 - Aim for recognizable caricatures rather than photorealism. Match face shape and hair silhouette
   first, adding glasses and other strong identity cues where appropriate; at gameplay scale, I can
   be more tolerant of clothing and body-shape differences.
+- Judge face identity in a same-scale contact sheet of the current roster. A fighter's face must
+  read as different when hair, glasses, clothing, and accessories are ignored; choosing another
+  stock donor or adding accessories alone does not pass. Keep integrating fighters through the
+  existing pipeline, but apply this face-level check before accepting each new body.
 - Treat a detailed donor as starting material, not a finished fighter. Use a bounded source-only
   proof and paused close views to reject weak face or appearance directions before clothing,
   rigging, or full gameplay capture; retire failed source lines instead of patching them indefinitely.

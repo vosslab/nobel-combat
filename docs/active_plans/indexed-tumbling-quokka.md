@@ -784,11 +784,17 @@ Research for every wave is already done in M4. Each wave has two milestones:
     - A temporary capture scored by `image_evaluator` against the dossier's defining features in
       both ordinary roster positions: rear-facing player slot and front-facing opponent slot.
       Each position includes idle, move, light, heavy, block, hit, down, and getup states.
+    - A same-scale contact sheet of the candidate with the current playable roster, including a
+      central-face crop. Judge the face itself across the lineup using visible face shape, brow and
+      eye region, complexion and age cues, cheeks, and facial hair. Hair, glasses, clothing,
+      accessories, silhouette, and donor choice are supporting information; none alone proves
+      facial distinction.
   - Pass condition: a sufficient combination of source-supported face, hair, and silhouette cues is
     readable in an ordinary gameplay view, the fighter is distinct from the shipped lineup, and the
-    silhouette and pose remain coherent in both positions across all eight states, especially down
-    and getup. Curie and Warburg set the intended fidelity: a fun, recognizable caricature, rather
-    than a portrait reconstruction.
+    face remains visually distinguishable from every fighter in the contact sheet when hair,
+    glasses, clothing, and accessories are disregarded. The silhouette and pose remain coherent in
+    both positions across all eight states, especially down and getup. Curie and Warburg set the
+    intended fidelity: a fun, recognizable caricature, rather than a portrait reconstruction.
   - Correction: at most 2 focused appearance revisions for one approach, then compare a simpler
     cleaned donor or choose a stronger donor. Appearance kits cannot substitute generic hair,
     clothes, or silhouette geometry.
@@ -874,6 +880,8 @@ supported rigid accessories meet the same visual gate; it is not a generic-body 
     in the test strategy below; the rest are deleted.
   - `npm audit --audit-level=high` and the Markdown links test pass.
   - The implemented roster is published as `docs/ACTIVE_COMBAT_ROSTER.md`.
+  - A current-roster contact sheet confirms every fighter remains face-distinguishable without
+    relying on hair, glasses, clothing, accessories, or donor selection.
   - The plan is moved with `git mv` to `docs/archive/roster_expansion.md`.
 - Workstreams: WS-DOC.
 - Entry criteria: M32 exit.

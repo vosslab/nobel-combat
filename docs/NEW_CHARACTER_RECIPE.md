@@ -148,6 +148,16 @@ effect.
       glasses or facial hair. Aim for a readable caricature, not portrait reconstruction. Clothing
       may proceed as a supporting cue once the simple donor comparison shows the identity direction
       is viable.
+- [ ] Before clothing or accessory work, compare the candidate face with every current fighter on a
+      same-scale contact sheet. Use the normal paused roster view and crop, and include a central-face
+      crop beside the full-head view. Judge face shape, brows and eyes, complexion, age cues, cheeks,
+      and facial hair; disregard hair, glasses, clothes, accessories, silhouette, and donor choice.
+      Record the contact sheet and verdict in the candidate handoff. A different donor or supporting
+      appearance cues cannot substitute for a distinct visible face.
+- [ ] If the face does not read as distinct from every current fighter, make at most two focused
+      face-only revisions of one approach or select a donor with a genuinely different face, then
+      repeat this comparison. Retire the candidate if it still fails; do not use clothing or
+      accessories to bypass the gate. Other fighter lanes continue through the pipeline.
 - [ ] Capture a paused front and both three-quarter views, then confirm the face and hair remain
       recognizable in the ordinary match camera. A close crop helps find placement errors; it does
       not replace the gameplay-scale view.
@@ -224,6 +234,10 @@ effect.
 
 - [ ] Give an independent `image_evaluator` the tracked handoff, both receipts, and both screenshot
       directories. Ask it to inspect all 16 frames.
+- [ ] Include the same-scale current-roster contact sheet and central-face crop from section 6.
+      The face must remain visually distinct from every current fighter when supporting appearance
+      cues are disregarded. This is a separate acceptance gate; close face views and full-body
+      gameplay captures do not replace it.
 - [ ] Include the three receipt-bound `opponent/face-*.png` crops in the identity review. They help
       expose cheek-crossing hair, false facial-hair cues, and glasses placement.
 - [ ] Require a distinct face-and-hair caricature at match scale and coherent human poses in both

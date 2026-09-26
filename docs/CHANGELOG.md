@@ -84,6 +84,12 @@
 
 ### Fixes and Maintenance
 
+- Added a required same-scale current-roster face comparison to the new-character recipe. The
+  existing 12 faces are under re-review; prior donor, hair, glasses, clothing, or silhouette
+  acceptance does not satisfy the face gate. Scratch-only McClintock brow, eyelid, nose, lip, and
+  cheek atlas marks reached the unchanged head but failed the roster sheet, so no production asset
+  changed.
+
 - Removed four generated Python bytecode files from roster authoring paths. The character recipe
   now uses an in-memory syntax check; its historical Goodenough record identifies `py_compile` as
   the source of the bytecode and retires it from future authoring guidance.
@@ -496,6 +502,24 @@
   moved implementation-only proofs plus the long Franklin endurance matrix to `tests/_temp/`.
 
 ### Decisions and Failures
+
+- Corrected the roster appearance gate to require face-level distinction on a same-scale contact
+  sheet of the current lineup. An exact-byte audit found five repeated face-atlas groups among twelve
+  fighters; Franklin, Buck, McClintock, Doudna, and Bertozzi share one atlas. Bounded Steitz and
+  Bertozzi portrait-to-atlas experiments put source pixels on unchanged donor geometry, but both
+  renders look patchy or stretched. A hand-painted brow, eye, cheek, and crease edit was cleaner but
+  did not make Bertozzi read as a different face. All three fail appearance acceptance. Textures and
+  matching game captures remain in ignored scratch; the runtime gains no face-generation system.
+  See the [face-texture experiment report](active_plans/reports/portrait_texture_experiment.md).
+
+- Captured and retired the bounded Anfinsen `male_32` scalp-cue candidate. On the same-scale roster
+  sheet the unchanged donor face looks older and more severe than the 1969 reference, while the gray
+  scalp pieces read as patches. The face was never altered, so this does not pass the revised face
+  gate; no further `male_32` attempt or roster promotion is planned.
+
+- Captured and retired Gabor's bounded `male_32` candidate. Its single gray upper-lip cue floats off
+  the face, and the untouched donor duplicates the retired Anfinsen face. The same-scale roster
+  sheet blocks appearance or FighterDef integration for this source.
 
 - Settled test and asset-authoring ownership. `tests/_temp/` is disposable evidence and the
   workspace for external checkouts, not a pytest or Playwright naming source. Tracked
