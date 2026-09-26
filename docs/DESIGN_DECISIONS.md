@@ -33,6 +33,22 @@ authoritative code or contract document, rather than a person.
 
 **Owner.** `src/match.ts` and `src/main.ts`.
 
+### Pausing freezes combat and animation while preserving view control
+
+**Decision.** Pause match ticks and Babylon animation groups together. Keep rendering and camera
+input active so a paused pose can be framed and screenshotted. Reset accumulated time on pause and
+resume so no delayed combat steps run after resuming.
+
+**Why.** The pause control supports visual review of character appearance, attacks, and poses. A
+frozen match with an active camera lets reviewers inspect the same combat moment from another view.
+
+**Consequence.** The Pause/Resume button and P/Space keys share one paused state; orbit, tilt, and
+zoom continue to update the camera while combat and visual effects stay frozen. Shift+Page Up/Down
+pans the paused view vertically to frame a face without changing the fighter pose. Paused zoom and
+vertical pan return to the match-safe view when play resumes.
+
+**Owner.** `src/main.ts`, `src/ui/hud.ts`, and `tests/playwright/pause_match.spec.ts`.
+
 ### AI randomness is isolated from rendering
 
 **Decision.** Give the AI controller its own seeded 32-bit random source. A normal app session draws
@@ -80,6 +96,24 @@ and mirror matches can use separate instances of the same cached source model.
 Pages build validates and copies the models named by the generated manifest.
 
 **Owner.** `src/rig/loader.ts`, `devel/write_model_manifest.mjs`, and `build_github_pages.sh`.
+
+### Accepted character bodies are preserved before roster registration
+
+**Decision.** After a body passes its two-position visual and rig gate, promote the exact
+SHA-sealed capture copy to `assets/models/` and record it in `assets/README.md` as accepted but
+unregistered. Keep `assets/models/MANIFEST.txt` generated exclusively from `FighterDef.body`
+paths; do not manually list candidates there.
+
+**Why.** Character-model waves can finish and preserve accepted artwork before their later fighter
+data waves register the fighter. The build ships only registry-backed models, so a second manual
+asset list would drift and could advertise assets the game does not load.
+
+**Consequence.** An accepted unregistered model is durable in the repository but is not copied into
+the Pages build or loaded at runtime. When its `FighterDef.body` path lands, regenerate the manifest;
+the existing build then ships it. The handoff keeps the capture SHA as provenance.
+
+**Owner.** `docs/NEW_CHARACTER_RECIPE.md`, the active roster expansion plan,
+`assets/README.md`, and `devel/write_model_manifest.mjs`.
 
 ### Warburg's apparatus follows the existing rig
 
@@ -272,24 +306,21 @@ the value through the authored `scaleWith` field without changing normal health 
 
 ### Combat bodies use the canonical native rig
 
-**Decision.** Curie uses the local CC0 Mesh2Motion `female_31.glb` body and the shared native combat
-clips. Every registered body must retain the canonical ordered 66-joint Mesh2Motion skeleton, and
-the runtime clones clips directly onto those joints. Runtime cross-rig retarget maps are not a
-supported body path.
+**Decision.** Curie uses the reviewed `mesh2motion_curie_period.glb` body and shared native combat
+clips. `female_31` remains donor/provenance material. Every registered body retains the canonical
+ordered 66-joint Mesh2Motion skeleton, and the runtime clones clips directly onto those joints.
+Runtime cross-rig retarget maps are not a supported body path.
 
-**Why.** The attractive period-dress candidate uses a separately authored IK rig. Correct bone
-names and mapped ancestry established that channels could be addressed, but did not establish
-compatible bind pose, bone roll, or skin weights. Several joints—especially the leg controls—could
-not safely follow the combat clips. Removing the foot and toe channels reduced the spider-like pose
-in one capture, but did not establish a compatible deformation contract. The distinct gray-updo
-Mesh2Motion body preserves a recognizable mature scientist silhouette while using the proven
-combat skeleton.
+**Why.** The live `female_31` route rendered an older bearded man. The reviewed period asset restores
+Curie's feminine face, gray updo, and maroon dress while retaining the proven combat skeleton. The
+earlier rig investigation still showed why body selection must prove bind pose, bone roll, skin
+weights, and rendered deformation rather than joint-name similarity alone.
 
-**Consequence.** Body variation is a data choice; animation compatibility is an asset contract.
-`tests/test_rig_boundary.mjs` checks every registered body against the canonical ordered skeleton
-and every combat clip against its complete joint set. A future model with a different rig must be
-authored to this skeleton and pass the same eight-state gate before registration. The retired
-period-dress GLB remains only as documented CC0 provenance.
+**Consequence.** Curie's `FighterDef.body` stays `mesh2motion_curie_period.glb`. Body variation is a
+data choice; animation compatibility is an asset contract. `tests/test_rig_boundary.mjs` checks every
+registered body against the canonical ordered skeleton and every combat clip against its complete
+joint set. A future model with a different rig must be authored to this skeleton and pass the same
+eight-state gate before registration.
 
 **Owner.** `src/roster/fighters_originals.ts`, `src/rig/clips.ts`, `src/rig/loader.ts`,
 `tests/test_rig_boundary.mjs`, `assets/models/MANIFEST.txt`, and `assets/README.md`.
@@ -342,7 +373,7 @@ derive their state from that committed v2 result.
 `src/main.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
 
-### Franklin reuses the authored female_9 presentation
+### Franklin reuses the authored female_9 presentation (superseded)
 
 **Decision.** Use the locally vendored `female_9` rig for Franklin, resolve her display identity
 from the roster fighter id, and retain the asset's authored appearance without adding a Franklin
@@ -359,6 +390,13 @@ use native cloned clips. A separate palette requires measurable visual evidence 
 **Owner.** `src/roster/fighters_originals.ts`, `src/rig/loader.ts`, `src/rig/clips.ts`,
 `src/rig/presentation.ts`, `src/main.ts`, and
 [`docs/archive/franklin_secret_fighter.md`](archive/franklin_secret_fighter.md).
+
+**Superseded by current appearance review.** The `female_9` asset still proves the independent
+two-instance loader and native clip contract, but its long straight hair and contemporary black
+outfit fail Franklin's face-first identity gate. The runtime body and its derived chooser portrait
+must be replaced together once a detailed Franklin source clears the visual and motion gates; a
+new portrait alone would hide the wrong in-game body. See the
+[Franklin visual rebuild](active_plans/workstreams/franklin_visual_rebuild.md).
 
 ### Franklin chooser fixture decoder (superseded)
 
@@ -456,6 +494,78 @@ appearance gate reopens.
 **Owner.** `src/roster/fighter_def.ts`, `src/rig/appearance_kit.ts`, and
 `tests/test_appearance_kit.mjs`.
 
+### Preserve qualifying donor mesh detail through rig adaptation
+
+**Decision.** Choose candidate sources by their rendered gameplay-scale quality. When a compatible
+licensed donor has a detailed human mesh and materials that support the fighter, preserve them
+through canonical-rig adaptation. Add only the source-supported hair, clothing, and silhouette
+details that the donor lacks. Use a fully authored body only when no available donor can meet the
+visual bar.
+
+**Why.** Current in-game captures show the detailed `female_9`, Warburg, and prior Curie bodies
+clearly outperforming primitive-built Goodenough, Steitz, and current McClintock bodies. Rig
+structure alone did not predict character quality. The old armature-only rule discarded useful
+detail and made a smooth primitive replacement the default.
+
+**Consequence.** `devel/check_candidate_body.mjs` checks the candidate's one canonical ordered
+66-joint skin, skin-0 mesh assignment, default-scene reachability, and basic GLB structure. It does
+not reject retained donor mesh names or decide appearance quality. Babylon loading, exact-SHA
+in-game captures, and visual review establish runtime rendering, sampled deformation, and identity.
+Record the rig donor separately from the capture host: the host selects the intercepted FighterDef
+body URL and applies that fighter's height and appearance kit, but it does not supply the candidate
+skeleton or repair order.
+
+**Owner.** `docs/NEW_CHARACTER_RECIPE.md`, `devel/check_candidate_body.mjs`,
+`devel/capture_candidate_body.sh`, and `tests/playwright/capture_rig_states.mjs`.
+
+Before Chromium starts, `devel/capture_candidate_body.sh` also loads the candidate through Babylon's
+glTF loader under NullEngine. This catches malformed assets such as invalid material references
+that pass structural checks but fail in the game loader.
+
+### Candidate authoring source stays tracked
+
+**Decision.** Keep each active fighter authoring script in `devel/roster_candidates/` and its
+handoff in `docs/active_plans/workstreams/`. Keep generated GLBs, capture receipts, and screenshots
+in ignored repo-local `tests/_temp/roster_work/`. In Graphify, allowlist only
+`devel/roster_candidates/` within the otherwise ignored `devel/` tree. The capture wrapper saves a
+SHA-named copy of the candidate in the capture directory and serves that copy.
+
+**Why.** Work kept only under ignored or external temporary directories is unavailable to normal
+repository search and Graphify's source map. Graphify excludes maintainer tooling by default, so
+moving source into `devel/` alone does not make it discoverable. Authoring scripts are source code
+worth preserving; generated models and screenshots are review evidence that would add binary churn
+if tracked.
+
+**Consequence.** The tracked script and handoff remain the discoverable lane record. The handoff
+points to the working candidate SHA and capture receipt. `.graphifyignore` re-includes only this
+authoring subtree while keeping the rest of `devel/` out of the graph. Each capture keeps the exact
+served bytes under its SHA-named copy, so later authoring cannot replace the model that was reviewed.
+Before promoting a model, the integrator uses the captured copy.
+
+**Owner.** `docs/NEW_CHARACTER_RECIPE.md`, `devel/roster_candidates/`, and
+`docs/active_plans/workstreams/`.
+
+### Test and authoring evidence have separate ownership
+
+**Decision.** Treat `tests/_temp/` as disposable evidence and the workspace for external
+checkouts, not as a pytest or Playwright naming source. Keep historical asset-authoring provenance
+in `devel/roster_candidates/` so Graphify can index it, and exclude that subtree from generic
+application-Python hygiene through the repository registry in `tests/conftest.py`. Each active
+proof owns its focused compile, render, and asset gates.
+
+**Why.** Broad collection found 39 external collection errors, and generic style scanning reported
+310 failures in historical authoring scripts. Those files record experiments rather than maintained
+application behavior; applying app-test naming and hygiene contracts to them obscures useful failures
+and makes ordinary validation unreliable.
+
+**Consequence.** Pytest and Playwright discover only their maintained test lanes. Evidence remains
+available beside its authoring handoff, Graphify retains the reproducible source, and an active
+proof records the focused checks that establish its own validity. No additional generic test is
+introduced for this boundary.
+
+**Owner.** `tests/conftest.py`, `tests/test_test_naming_conventions.py`,
+`devel/roster_candidates/`, and `docs/NEW_CHARACTER_RECIPE.md`.
+
 ### Match owns an explicit fighter pair
 
 **Decision.** Store and validate both fighter ids on `Match`; let `main.ts` choose the opponent from
@@ -483,3 +593,75 @@ readability of the play space while remaining subordinate to the fighters and in
 arena detail must retain ordinary combat readability in both roster slots before it is kept.
 
 **Owner.** `src/main.ts` and `tests/playwright/capture_rig_states.mjs`.
+
+### Fighter integration follows direct readiness
+
+**Decision.** Integrate each roster fighter when its own body has passed the visual and rig gate,
+its exact accepted asset and provenance are available, and the registry contains every direct
+`FighterDef` prerequisite named by its actual unlock rule.
+
+**Why.** A model or integration delay for one fighter does not affect the correctness of an
+unrelated fighter. Whole-wave and predecessor-wave dependencies made independent ready fighters
+wait without protecting an actual runtime or progression contract.
+
+**Consequence.** Wave milestones summarize their assigned fighters and close when all of those
+fighters ship, but do not gate other lanes. The existing unlock tree remains authoritative; no
+temporary or unrelated unlock changes may bypass a missing direct prerequisite.
+
+**Owner.** `docs/active_plans/indexed-tumbling-quokka.md`,
+`docs/active_plans/active/roster_expansion.md`, and the roster integrator.
+
+### Chooser portraits show the fighter's actual face and hair
+
+**Decision.** Give every registered `FighterDef` a portrait captured from its
+current runtime body in the paused game. Frame the face and hair as the main
+subject so players can identify the character at a glance.
+
+**Why.** The chooser needs a recognizable face, and the actual fighter render
+keeps the selection image honest when a model's face or hairstyle still needs
+work.
+
+**Consequence.** Keep the portrait path on each `FighterDef`, validate that its
+PNG exists before the destructive Pages build, and copy roster portraits with
+the game. Do not substitute donor photos or unrelated art for the in-game
+character.
+
+**Owner.** `src/roster/fighter_def.ts`, `src/ui/chooser.ts`,
+`devel/capture_fighter_portraits.mjs`, `devel/write_model_manifest.mjs`, and
+`build_github_pages.sh`.
+
+### Face-source review distinguishes geometry from unfinished presentation
+
+**Decision.** Judge a source proof's face geometry separately from missing or broken appearance
+information. Repair an incomplete UV, material, iris, hair, or crop once on fixed geometry before
+rejecting that source for an appearance-only failure. Reject a source whose visible face outline,
+jaw, brow, nose, or other primary structure is already incompatible.
+
+**Why.** Recent head proofs combined real geometry mismatch with missing texture and hair evidence.
+Treating either condition as proof of the other would discard a potentially useful source or spend
+iterations polishing a structurally wrong head.
+
+**Consequence.** A focused correction remains source-only and does not authorize a head graft,
+rig, costume, GLB, or FighterDef. The normal paused front and three-quarter review remains the
+gate for further work.
+
+**Owner.** `docs/NEW_CHARACTER_RECIPE.md`, `devel/roster_candidates/`, and the relevant tracked
+candidate handoff.
+
+### Roster identity uses gameplay-scale caricatures
+
+**Decision.** Use an existing coherent human donor with a small set of distinguishing cues as the
+default character-production route. Treat Curie and Warburg as the fidelity reference. Use
+photo-to-3D, generated heads, or grafts only as bounded comparisons when that route fails at normal
+gameplay scale.
+
+**Why.** The product needs 25 distinct, fun fighters, and extra head geometry can obscure the cues
+that make a character readable. Portrait reconstruction has not demonstrated enough value to be the
+default cost for each lane.
+
+**Consequence.** Face shape and hair remain the first identity cues, but paused close views diagnose
+broken geometry and placement rather than demanding portrait likeness. A candidate can proceed when
+its ordinary game view is recognizable, coherent, and rig-correct; elaborate experiments must show
+a visible gameplay improvement over the cleaned-up donor.
+
+**Owner.** `docs/NEW_CHARACTER_RECIPE.md` and the active roster-expansion plan.

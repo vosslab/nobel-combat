@@ -27,6 +27,8 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
 - Keep compatibility fixtures out of production builds; do not return to the chunky Quaternius look.
 - Keep visible meshes separate from gameplay hit geometry. Keep retargeting specific to each body.
   The planned 25-fighter game demonstrates the need for a shared roster and appearance kits.
+- Use the Pause/Resume button, P, or Space to freeze a useful combat pose for screenshots. Keep
+  orbit, tilt, and zoom controls available while the fighters are paused.
 - Capture deterministic state screenshots as artifacts and validate asset load, skeletons, animation
   selection, and browser behavior automatically; human visual approval is not a completion gate.
 - Otto Heinrich Warburg is the signature and deliberately strongest fighter, with powers based on
@@ -35,6 +37,8 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
 - Always use Otto Heinrich Warburg's full name; Heinrich is important.
 - Give Marie Curie a visibly distinct feminine face without facial hair; her current hairstyle is
   acceptable.
+- For Barbara McClintock's 1947 appearance, keep her clean-shaven, with short swept dark hair,
+  small round glasses, and a light laboratory coat.
 - Marie Curie should wear period-appropriate clothing, not modern female street clothes.
 - Make Nobel Combat fun and silly, not an educational product. Research should make the humor
   recognizable; a player who gets curious and reads more about a scientist is a bonus.
@@ -61,3 +65,37 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
 - Add visual arena detail only when it stays quiet and does not compete with the fighters.
 - On macOS, run Chromium-backed captures outside the sandbox with escalation. Use the repository
   candidate capture command for both roster positions; a script cannot grant itself that access.
+- Use one [NEW_CHARACTER_RECIPE.md](NEW_CHARACTER_RECIPE.md) checklist for every new fighter lane
+  so subagents repeat the sourced appearance, authoring, capture, and review steps.
+- Keep fighter authoring scripts and handoffs in tracked repository paths so agents can find and
+  graph the work; keep generated GLBs and capture images in ignored repo-local scratch.
+- Keep the visual and rig bar steady: reject technically sound but generic candidates, preserve
+  accepted models and their provenance, and keep independent model lanes moving in parallel.
+- Prefer the richest compatible licensed body models that pass in-game review. Preserve useful
+  donor mesh and material detail while adapting rigs; use screenshots at gameplay scale to decide.
+- Aim for recognizable caricatures rather than photorealism. Match face shape and hair silhouette
+  first, adding glasses and other strong identity cues where appropriate; at gameplay scale, I can
+  be more tolerant of clothing and body-shape differences.
+- Treat a detailed donor as starting material, not a finished fighter. Use a bounded source-only
+  proof and paused close views to reject weak face or appearance directions before clothing,
+  rigging, or full gameplay capture; retire failed source lines instead of patching them indefinitely.
+- Favor adaptable foundations that can evolve as requirements change, but do not let a search for
+  perfection delay a system that already meets the actual need.
+- Let the established review pipeline increase playable fighter throughput. Move a source that
+  passes the necessary gates toward a complete FighterDef with body, specials, captions, AI, and
+  unlocks; extend review machinery only when a concrete new failure shows a gap.
+- Use small experiments, comparisons, and measurements before committing to uncertain appearance
+  methods. Spend review effort on decisions that affect fighter quality, correctness, maintenance,
+  validation, or delivery rather than minor presentation details.
+- Treat a painted face bitmap and mapped hair geometry as a bounded source experiment. They may
+  reinforce cues on a compatible detailed head, but do not substitute for face geometry when
+  front and three-quarter review still reads as the donor.
+- Keep the browser game and ordinary authoring previews light on 3D load. Retain a native
+  high-resolution source offline when useful, but reduce the mesh before repeated color review,
+  rigging, or browser capture; use bounded, vectorized diagnostics and serialize heavyweight
+  offline jobs under one owner.
+- Use Curie and Warburg as the fidelity anchor: a decent human head plus the right hair, glasses,
+  age, facial-hair cues, clothing, and silhouette can make a fun, recognizable caricature. Compare
+  the simplest cleaned-up donor against elaborate face work at ordinary gameplay scale before
+  investing further. Photo-to-3D and face-generation work remain bounded experiments, not the
+  roster's assumed production route.

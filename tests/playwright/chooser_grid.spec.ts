@@ -72,6 +72,35 @@ test("chooser grid keeps its columns, Franklin secrecy, detail, and vertical nav
   await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
 });
 
+test("chooser cards load a face-first portrait for every rendered fighter", async ({
+  page,
+  baseURL,
+}) => {
+  await page.goto(liveUrl(baseURL!));
+  const portraits = page.locator(".fighter-choice .fighter-portrait");
+  await expect(portraits.first()).toBeVisible();
+  await portraits.evaluateAll((images) =>
+    Promise.all(
+      images.map((image) => {
+        if (!(image instanceof HTMLImageElement)) throw new Error("Expected a portrait image.");
+        return image.decode();
+      }),
+    ),
+  );
+  const dimensions = await portraits.evaluateAll((images) =>
+    images.map((image) => {
+      if (!(image instanceof HTMLImageElement)) throw new Error("Expected a portrait image.");
+      return { complete: image.complete, width: image.naturalWidth, height: image.naturalHeight };
+    }),
+  );
+  expect(dimensions).not.toHaveLength(0);
+  for (const image of dimensions) {
+    expect(image.complete).toBe(true);
+    expect(image.width).toBeGreaterThan(0);
+    expect(image.height).toBeGreaterThan(0);
+  }
+});
+
 test("keyboard and gamepad open the focused Nobel link without confirming a match", async ({
   page,
   baseURL,

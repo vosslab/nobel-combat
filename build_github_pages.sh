@@ -1,33 +1,15 @@
 #!/usr/bin/env bash
-# build_github_pages.sh - canonical production build for GitHub Pages.
-#
-# Front door: run this directly as ./build_github_pages.sh. It is the
-# interface for everyone, no npm knowledge required. The npm run build
-# alias is an optional mirror that points right back at this script.
-#
-# Contract:
-#   - Wipes dist/ from scratch.
-#   - Type-checks via 'tsc --noEmit -p tsconfig.json'.
-#   - Resolves the entry: src/main.ts preferred, src/init.ts legacy fallback.
-#     Aborts with an actionable error if neither exists.
-#   - Verifies src/index.html and src/style.css exist before copying;
-#     aborts with an actionable error if missing.
-#   - Verifies src/index.html references main.js with a module script
-#     tag (warns if missing -- the page will load but main.js is dead).
-#   - Bundles the entry into dist/main.js with esbuild (ESM, es2020,
-#     browser, minified, with sourcemap).
-#   - Copies src/index.html and src/style.css into dist/.
-#   - Writes dist/.nojekyll so GitHub Pages serves files starting with _.
-#   - Asserts dist/index.html and dist/main.js exist before exiting.
-#
-# Hard rule: never produces single-file output. ESM only.
+# Canonical GitHub Pages build. Run ./build_github_pages.sh directly.
+# It checks the shipped model and portrait manifests, validates required source
+# assets, type-checks, then creates a clean ESM dist/ bundle with assets.
+# The npm build alias mirrors this command; output is never single-file.
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 # Confirm the tracked shipped-model list matches the roster before the build
 # checks any source files or removes the previous dist/ output.
-node --import tsx devel/write_model_manifest.mjs --check
+PORTRAITS="$(node --import tsx devel/write_model_manifest.mjs --check --print-portraits)"
 
 while IFS= read -r model || [ -n "$model" ]; do
 	if [[ ! "$model" =~ ^assets/models/[a-z0-9_]+\.glb$ ]]; then
@@ -40,16 +22,11 @@ while IFS= read -r model || [ -n "$model" ]; do
 	fi
 done < assets/models/MANIFEST.txt
 
-# Resolve entry point.
-if [ -f "src/main.ts" ]; then
-	ENTRY="src/main.ts"
-elif [ -f "src/init.ts" ]; then
-	ENTRY="src/init.ts"
-	echo "WARNING: using legacy src/init.ts. Rename to src/main.ts." >&2
-else
-	echo "ERROR: no entry point. Create src/main.ts (preferred) or src/init.ts." >&2
+if [ ! -f "src/main.ts" ]; then
+	echo "ERROR: required application entry is missing: src/main.ts" >&2
 	exit 1
 fi
+ENTRY="src/main.ts"
 
 # Verify required static assets before any destructive step.
 for required in \
@@ -94,13 +71,16 @@ npx esbuild "$ENTRY" \
 
 cp src/index.html dist/index.html
 cp src/style.css dist/style.css
-mkdir -p dist/assets/models dist/assets/animations
+mkdir -p dist/assets/models dist/assets/animations dist/assets/portraits
 while IFS= read -r model || [ -n "$model" ]; do
 	cp "$model" dist/assets/models/
 done < assets/models/MANIFEST.txt
 cp assets/models/MANIFEST.txt dist/assets/models/
 cp assets/animations/mesh2motion_human_base.glb dist/assets/animations/
 cp assets/animations/mesh2motion_human_addon.glb dist/assets/animations/
+while IFS= read -r portrait || [ -n "$portrait" ]; do
+	cp "$portrait" dist/assets/portraits/
+done <<< "$PORTRAITS"
 touch dist/.nojekyll
 
 test -f dist/index.html
@@ -111,5 +91,8 @@ while IFS= read -r model || [ -n "$model" ]; do
 done < assets/models/MANIFEST.txt
 test -s dist/assets/animations/mesh2motion_human_base.glb
 test -s dist/assets/animations/mesh2motion_human_addon.glb
+while IFS= read -r portrait || [ -n "$portrait" ]; do
+	test -s "dist/$portrait"
+done <<< "$PORTRAITS"
 
 echo "Built dist/ (GitHub Pages-ready)."

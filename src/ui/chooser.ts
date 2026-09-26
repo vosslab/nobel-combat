@@ -277,16 +277,25 @@ export class FighterChooser {
 
   private createChoice(id: FighterId, unlocked: boolean): HTMLElement {
     const fighter = fighterById(id);
+    const portrait = document.createElement("img");
+    portrait.className = "fighter-portrait";
+    portrait.src = fighter.portrait;
+    portrait.alt = "";
+    portrait.setAttribute("aria-hidden", "true");
     if (!unlocked) {
       const card = document.createElement("article");
       card.className = "fighter-choice fighter-choice-locked";
-      card.setAttribute("aria-label", `Locked fighter: ${unlockHint(fighter.unlock)}`);
-      const silhouette = document.createElement("span");
-      silhouette.className = "fighter-silhouette";
-      silhouette.setAttribute("aria-hidden", "true");
+      card.setAttribute(
+        "aria-label",
+        `Locked fighter: ${fighter.name}. ${unlockHint(fighter.unlock)}.`,
+      );
+      const description = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = fighter.name;
       const hint = document.createElement("small");
       hint.textContent = unlockHint(fighter.unlock);
-      card.append(silhouette, hint);
+      description.append(name, hint);
+      card.append(portrait, description);
       return card;
     }
     const label = document.createElement("label");
@@ -303,14 +312,22 @@ export class FighterChooser {
     const detail = document.createElement("small");
     detail.textContent = capitalize(fighter.verb);
     description.append(name, detail);
-    label.append(input, description);
+    label.append(input, portrait, description);
     return label;
   }
 
   private renderDetail(id: FighterId): void {
     const fighter = fighterById(id);
+    const header = document.createElement("div");
+    header.className = "fighter-detail-header";
+    const portrait = document.createElement("img");
+    portrait.className = "fighter-detail-portrait";
+    portrait.src = fighter.portrait;
+    portrait.alt = "";
+    portrait.setAttribute("aria-hidden", "true");
     const heading = document.createElement("h2");
     heading.textContent = fighter.name;
+    header.append(portrait, heading);
     const prize = document.createElement("p");
     prize.className = "fighter-prize";
     prize.textContent = fighter.prize
@@ -328,7 +345,7 @@ export class FighterChooser {
       item.append(name, document.createTextNode(` \u2014 ${special.caption}`));
       specials.append(item);
     }
-    const contents: Node[] = [heading, prize, verb, specials];
+    const contents: Node[] = [header, prize, verb, specials];
     if (fighter.prize) {
       const link = document.createElement("a");
       link.href = fighter.prize.url;

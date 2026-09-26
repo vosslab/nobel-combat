@@ -85,6 +85,7 @@ async function candidateOverride(playerId, opponentId) {
     sha256: actualSha256,
     url: new URL(fighter.body, debugUrl()).toString(),
     bodyOwner,
+    height: fighter.height,
     bytes,
   };
 }
@@ -130,6 +131,83 @@ async function forceState(page, state, ticks) {
   // fixed delay records a readable, repeatable point after their transition.
   await page.waitForTimeout(300);
   await settle(page);
+}
+
+async function orbitForFaceView(page, pixels, filename, directory, crop) {
+  await page.mouse.move(640, 400);
+  await page.mouse.down();
+  await page.mouse.move(640 + pixels, 400, { steps: 10 });
+  await page.mouse.up();
+  await settle(page);
+  await page.screenshot({
+    path: resolve(directory, filename),
+    clip: crop,
+    scale: "device",
+  });
+}
+
+async function captureFaceViews(page, directory, override) {
+  await forceState(page, "idle", 0);
+  await page.evaluate(() => {
+    const fight = window.__fightDebug;
+    fight.forceFighter(0, {
+      x: -0.6,
+      z: 0,
+      state: "idle",
+      ticks: 0,
+      attackHeld: false,
+      hitDone: false,
+    });
+    fight.forceFighter(1, {
+      x: 0.6,
+      z: 0,
+      state: "idle",
+      ticks: 0,
+      attackHeld: false,
+      hitDone: false,
+    });
+  });
+  await settle(page);
+  await page.keyboard.press("p");
+  await page.waitForFunction(
+    () => document.querySelector("#pause-match")?.getAttribute("aria-pressed") === "true",
+  );
+  await page.keyboard.down("Shift");
+  await page.keyboard.down("PageUp");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("PageUp");
+  await page.keyboard.up("Shift");
+  await page.keyboard.down("BracketRight");
+  await page.waitForTimeout(1300);
+  await page.keyboard.up("BracketRight");
+  await page.addStyleTag({ content: "#status,.hud,.help,button{visibility:hidden!important}" });
+  await page.mouse.move(640, 400);
+  await settle(page);
+
+  // Keep the full paused frame so a fixed crop never hides a misplaced head.
+  await page.screenshot({ path: resolve(directory, "face-scene.png"), scale: "device" });
+
+  const crop = {
+    x: 700,
+    y: 100,
+    width: 320,
+    height: 320,
+  };
+  await page.screenshot({
+    path: resolve(directory, "face-front.png"),
+    clip: crop,
+    scale: "device",
+  });
+  await orbitForFaceView(page, -50, "face-orbit-left.png", directory, crop);
+  await orbitForFaceView(page, 100, "face-orbit-right.png", directory, crop);
+  return {
+    fighterId: override.bodyOwner,
+    state: "idle",
+    paused: true,
+    crop,
+    cameraYawOffsetsRadians: [0, -0.3, 0.3],
+    files: ["face-scene.png", "face-front.png", "face-orbit-left.png", "face-orbit-right.png"],
+  };
 }
 
 async function captureWarburgManometer(page, directory, playerId, opponentId) {
@@ -314,6 +392,10 @@ async function main() {
     if (playerId === "warburg" || opponentId === "warburg") {
       await captureWarburgManometer(page, directory, playerId, opponentId);
     }
+    const faceReview =
+      override?.bodyOwner === opponentId
+        ? await captureFaceViews(page, directory, override)
+        : undefined;
     if (override) {
       assert(servedSha256.length > 0, `Candidate body URL was never requested: ${override.url}`);
       assert(
@@ -334,6 +416,7 @@ async function main() {
           overriddenUrl: override.url,
           candidateSha256: override.sha256,
           servedSha256,
+          faceReview,
         })}\n`,
       );
     }

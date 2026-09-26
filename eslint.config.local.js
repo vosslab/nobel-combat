@@ -17,5 +17,27 @@
 //     },
 //   ];
 //
-// Default: no local overrides.
-export default [];
+import globals from "globals";
+
+// Capture helpers pass callbacks to Playwright for execution in the game page.
+// Those callbacks intentionally use browser globals while the surrounding
+// scripts remain Node-based.
+export default [
+  {
+    files: [
+      "devel/capture_fighter_portraits.mjs",
+      "devel/roster_candidates/m14/mcclintock/generated_head_graft/capture_mcclintock_generated_head_graft_v1.mjs",
+      "devel/roster_candidates/m14/mcclintock/simple_donor_comparison/capture_simple_donor_comparison.mjs",
+      "devel/roster_candidates/m22/buck/simple_donor/capture_buck_simple_donor_v1.mjs",
+      "devel/roster_candidates/m22/buck/simple_donor/capture_buck_simple_donor_v2.mjs",
+      "devel/roster_candidates/m22/hodgkin/curie_donor/capture_hodgkin_curie_donor_v1.mjs",
+      "devel/roster_candidates/m22/hodgkin/curie_donor/capture_hodgkin_curie_donor_v2.mjs",
+      "devel/roster_candidates/m22/hodgkin/simple_donor/capture_hodgkin_simple_donor_v1.mjs",
+      "devel/roster_candidates/m24/tsien/simple_donor/capture_tsien_simple_donor_v2.mjs",
+      "devel/roster_candidates/m24/tsien/simple_donor/capture_tsien_simple_donor_v3.mjs",
+    ],
+    languageOptions: {
+      globals: { ...globals.browser },
+    },
+  },
+];

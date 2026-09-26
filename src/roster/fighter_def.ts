@@ -184,6 +184,8 @@ export type FighterDef = Readonly<{
   prize: NobelPrize | null;
   verb: string;
   body: string;
+  /** A face-first crop used by the chooser to identify the fighter at a glance. */
+  portrait: string;
   height: number;
   stats: FighterStats;
   meterGain: number;

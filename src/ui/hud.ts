@@ -25,9 +25,15 @@ type HudElements = Readonly<{
 }>;
 
 export const CONTROL_HELP: ControlHelp = {
-  keyboard: ["WASD move", "J light", "K heavy knockdown", "L block", "I Special", "R restart"].join(
-    " \u00b7 ",
-  ),
+  keyboard: [
+    "WASD move",
+    "J light",
+    "K heavy knockdown",
+    "L block",
+    "I Special",
+    "P/Space pause",
+    "R restart",
+  ].join(" \u00b7 "),
   gamepad: [
     "Gamepad: left stick/D-pad move",
     "right stick view",

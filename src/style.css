@@ -217,15 +217,15 @@ canvas {
 }
 .fighter-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
-  width: min(100%, 790px);
+  width: min(100%, 900px);
   min-width: 0;
 }
 .fighter-choice {
   display: flex;
-  min-height: 84px;
-  align-items: flex-start;
+  min-height: 104px;
+  align-items: center;
   gap: 10px;
   padding: 12px;
   border: 1px solid #63738b;
@@ -237,14 +237,15 @@ canvas {
   color: #9aa8bb;
   opacity: 0.78;
 }
-.fighter-silhouette {
-  display: block;
-  width: 32px;
-  height: 42px;
+.fighter-portrait {
+  width: 72px;
+  height: 72px;
   flex: 0 0 auto;
-  border-radius: 50% 50% 38% 38%;
-  background: linear-gradient(#6e7c91 0 34%, transparent 34%), #435268;
-  clip-path: polygon(25% 0, 75% 0, 100% 38%, 78% 38%, 94% 100%, 6% 100%, 22% 38%, 0 38%);
+  border: 1px solid #889bb6;
+  border-radius: 5px;
+  background: #202937;
+  object-fit: cover;
+  object-position: center top;
 }
 .fighter-choice:has(input:checked) {
   border-color: #ffdf5a;
@@ -273,6 +274,21 @@ canvas {
 }
 .fighter-detail h2 {
   font-size: 1.1rem;
+}
+.fighter-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fighter-detail-portrait {
+  width: 136px;
+  height: 136px;
+  flex: 0 0 auto;
+  border: 1px solid #889bb6;
+  border-radius: 6px;
+  background: #202937;
+  object-fit: cover;
+  object-position: center top;
 }
 .fighter-prize,
 .fighter-verb,
@@ -320,10 +336,14 @@ canvas {
 }
 .change-fighter {
   right: 162px;
+  bottom: 66px;
 }
 .retry-model-load {
   right: 162px;
   bottom: 66px;
+}
+.pause-match {
+  right: 162px;
 }
 .selection-controls {
   margin: 13px 0 0 !important;

@@ -31,8 +31,26 @@ if [[ ! -f "$candidate_glb" ]]; then
   exit 2
 fi
 
+repo_root=$(git -C "$(dirname "${BASH_SOURCE[0]}")/.." rev-parse --show-toplevel)
+node "$repo_root/devel/check_candidate_body.mjs" "$candidate_glb"
+node "$repo_root/devel/check_candidate_load.mjs" "$candidate_glb"
 candidate_sha256=$(node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));' "$candidate_glb")
-repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+mkdir -p "$output_dir"
+captured_candidate="$output_dir/candidate-$candidate_sha256.glb"
+if [[ -e "$captured_candidate" ]]; then
+  if ! cmp -s "$candidate_glb" "$captured_candidate"; then
+    printf 'Captured candidate path has different bytes: %s\n' "$captured_candidate" >&2
+    exit 1
+  fi
+else
+  cp "$candidate_glb" "$captured_candidate"
+fi
+captured_sha256=$(node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));' "$captured_candidate")
+if [[ "$captured_sha256" != "$candidate_sha256" ]]; then
+  printf 'Captured candidate copy changed during copy: %s\n' "$captured_candidate" >&2
+  exit 1
+fi
+candidate_glb=$captured_candidate
 cd "$repo_root"
 
 capture() {

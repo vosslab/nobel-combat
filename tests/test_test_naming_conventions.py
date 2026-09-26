@@ -216,8 +216,11 @@ def list_mjs_files_outside_playwright() -> list[str]:
 	"""
 	tests_dir = os.path.join(REPO_ROOT, "tests")
 	playwright_dir = get_playwright_dir()
+	temp_dir = os.path.join(tests_dir, "_temp")
 	files = []
 	for root, dirs, filenames in os.walk(tests_dir):
+		# Local boundary: tests/_temp holds disposable authoring evidence, not repo tests.
+		dirs[:] = [name for name in dirs if os.path.join(root, name) != temp_dir]
 		if root.startswith(playwright_dir):
 			continue
 		for filename in filenames:

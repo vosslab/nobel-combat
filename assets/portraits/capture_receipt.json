@@ -1,0 +1,215 @@
+{
+  "url": "http://127.0.0.1:4201/",
+  "receipts": [
+    {
+      "fighterId": "jennifer_doudna",
+      "body": "assets/models/mesh2motion_doudna_2018.glb",
+      "bodySha256": "2baf62bac816b63e8180ef3119d5d9f14985455658b9c6de4b57d9e309dea39a",
+      "comparisonId": "warburg",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 244,
+        "width": 170,
+        "height": 170
+      },
+      "image": "doudna.png",
+      "imageSha256": "02426e38e1cb3806dc9eaf43b9faf4f75dbd86636506b0090e58a2c4711f6c49",
+      "servedBodySha256": [
+        {
+          "fighterId": "jennifer_doudna",
+          "sha256": "2baf62bac816b63e8180ef3119d5d9f14985455658b9c6de4b57d9e309dea39a"
+        },
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        }
+      ]
+    },
+    {
+      "fighterId": "warburg",
+      "body": "assets/models/mesh2motion_doctor_m.glb",
+      "bodySha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d",
+      "comparisonId": "curie",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 220,
+        "width": 170,
+        "height": 170
+      },
+      "image": "warburg.png",
+      "imageSha256": "78150b1ab5e9dd850b85c459a1e956fc700ff695dee9eb2b903a69e2d6dc92af",
+      "servedBodySha256": [
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        },
+        {
+          "fighterId": "curie",
+          "sha256": "cf3f4ccbd838e53b2995824bfa0ecc56c930916b7cd457e73a21daa5d72e1a96"
+        }
+      ]
+    },
+    {
+      "fighterId": "curie",
+      "body": "assets/models/mesh2motion_curie_period.glb",
+      "bodySha256": "cf3f4ccbd838e53b2995824bfa0ecc56c930916b7cd457e73a21daa5d72e1a96",
+      "comparisonId": "warburg",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 256,
+        "width": 170,
+        "height": 170
+      },
+      "image": "curie.png",
+      "imageSha256": "a3ab74fa9d97b81cc3724d13f2707a446816a9aaca1d1491403f300e9ea6bbfe",
+      "servedBodySha256": [
+        {
+          "fighterId": "curie",
+          "sha256": "cf3f4ccbd838e53b2995824bfa0ecc56c930916b7cd457e73a21daa5d72e1a96"
+        },
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        }
+      ]
+    },
+    {
+      "fighterId": "franklin",
+      "body": "assets/models/mesh2motion_female_9.glb",
+      "bodySha256": "9a60dd24d126f0118f4dd84a830495c094dc72b9ae89de122ca685f5a78950f8",
+      "comparisonId": "warburg",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 240,
+        "width": 170,
+        "height": 170
+      },
+      "image": "franklin.png",
+      "imageSha256": "e4e7a5e53ff67a508d47270f9fa67a385d57258b94d7da0d0996d17154af8477",
+      "servedBodySha256": [
+        {
+          "fighterId": "franklin",
+          "sha256": "9a60dd24d126f0118f4dd84a830495c094dc72b9ae89de122ca685f5a78950f8"
+        },
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        }
+      ]
+    },
+    {
+      "fighterId": "barbara_mcclintock",
+      "body": "assets/models/mesh2motion_mcclintock.glb",
+      "bodySha256": "6dbf479fa42e78d1890539a19dfd70953e545cd8894ea6efe4e8dafaad720d07",
+      "comparisonId": "warburg",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 250,
+        "width": 170,
+        "height": 170
+      },
+      "image": "mcclintock.png",
+      "imageSha256": "9b767b57a927c36f8e22e3b7ee8be3be4dffee859fac53f173d7f26baab4c788",
+      "servedBodySha256": [
+        {
+          "fighterId": "barbara_mcclintock",
+          "sha256": "6dbf479fa42e78d1890539a19dfd70953e545cd8894ea6efe4e8dafaad720d07"
+        },
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        }
+      ]
+    },
+    {
+      "fighterId": "john_b_goodenough",
+      "body": "assets/models/mesh2motion_goodenough_1964.glb",
+      "bodySha256": "62f9a8aa574eaaadb370963aa509e5708f4aaf384800ef70e6e0958aafa77b55",
+      "comparisonId": "warburg",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 220,
+        "width": 170,
+        "height": 170
+      },
+      "image": "goodenough.png",
+      "imageSha256": "fb74edc1a7f21674199e3daa1b8b03853bc5a676e71b43f47e8cf748ceadfc7f",
+      "servedBodySha256": [
+        {
+          "fighterId": "john_b_goodenough",
+          "sha256": "62f9a8aa574eaaadb370963aa509e5708f4aaf384800ef70e6e0958aafa77b55"
+        },
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        }
+      ]
+    },
+    {
+      "fighterId": "linda_buck",
+      "body": "assets/models/mesh2motion_buck_2002.glb",
+      "bodySha256": "ce50702172037389565fb226c39d565fbc3079593df474e6fc65147d8f7c4d04",
+      "comparisonId": "warburg",
+      "capturePose": "paused idle; shared front-biased face-and-hair crop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "deviceScaleFactor": 4
+      },
+      "crop": {
+        "x": 1050,
+        "y": 244,
+        "width": 170,
+        "height": 170
+      },
+      "image": "buck.png",
+      "imageSha256": "c9c03e8dde3a26b70fbffb39ac039577512a7a144a3bacde5290ce9e90a724a3",
+      "servedBodySha256": [
+        {
+          "fighterId": "linda_buck",
+          "sha256": "ce50702172037389565fb226c39d565fbc3079593df474e6fc65147d8f7c4d04"
+        },
+        {
+          "fighterId": "warburg",
+          "sha256": "2923d429514cdbe6c996c99929b6872544ed3a39daa10086d0d490ce8d7cff3d"
+        }
+      ]
+    }
+  ]
+}

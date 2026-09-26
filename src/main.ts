@@ -71,6 +71,7 @@ const fighterSelectHelp = document.querySelector<HTMLElement>("#fighter-select-h
 const startMatch = document.querySelector<HTMLButtonElement>("#start-match");
 const changeFighter = document.querySelector<HTMLButtonElement>("#change-fighter");
 const retryModelLoad = document.querySelector<HTMLButtonElement>("#retry-model-load");
+const pauseMatch = document.querySelector<HTMLButtonElement>("#pause-match");
 const franklinUnlockAnnouncement = document.querySelector<HTMLElement>(
   "#franklin-unlock-announcement",
 );
@@ -109,6 +110,7 @@ if (
   !startMatch ||
   !changeFighter ||
   !retryModelLoad ||
+  !pauseMatch ||
   !franklinUnlockAnnouncement ||
   !playerMoveHelp ||
   !gamepadMoveHelp
@@ -205,6 +207,26 @@ let pendingModelPair: string | null = null;
 let failedModelPair: string | null = null;
 let modelLoadRevision = 0;
 const match = new Match();
+let matchPaused = false;
+function syncSceneAnimationPlayback(): void {
+  for (const group of scene.animationGroups) {
+    if (matchPaused) group.pause();
+    else group.play();
+  }
+}
+function setMatchPaused(paused: boolean): void {
+  if (matchPaused === paused) return;
+  matchPaused = paused;
+  if (!paused) {
+    cameraZoom = Math.max(cameraZoom, MIN_MATCH_CAMERA_ZOOM);
+    cameraFocusY = 0;
+  }
+  pauseMatch!.textContent = paused ? "Resume match" : "Pause match";
+  pauseMatch!.setAttribute("aria-pressed", String(paused));
+  syncSceneAnimationPlayback();
+  accumulator = 0;
+  last = performance.now();
+}
 type SpecialBanner = {
   root: HTMLElement;
   name: HTMLElement;
@@ -367,6 +389,7 @@ const fighterChooser = new FighterChooser({
     mapSelectionInput(keys, navigator.getGamepads?.()[0]),
   canReopen: (): boolean => match.phase === "matchOver",
   onOpen: (): void => {
+    setMatchPaused(false);
     restartHeld = false;
     accumulator = 0;
   },
@@ -385,6 +408,9 @@ else {
   requestAnimationFrame(() => fighterChooser.focusSelected());
 }
 if (playtestMode()) {
+  Object.defineProperty(window, "__fightAnimationGroups", {
+    value: () => scene.animationGroups.map((group) => ({ isPlaying: group.isPlaying })),
+  });
   Object.defineProperty(window, "__fightSetProgress", {
     value: (value: unknown): void => setInjectedProgress(value),
   });
@@ -401,12 +427,78 @@ if (playtestMode() === "debug") {
 let cameraYaw = 0;
 let cameraPitch = 0.5;
 let cameraZoom = 1;
+let cameraFocusY = 0;
+const MIN_MATCH_CAMERA_ZOOM = 0.85;
+const MIN_PAUSED_CAMERA_ZOOM = 0;
+const MAX_CAMERA_ZOOM = 1.5;
 let cameraFramed = false;
 let dragging = false;
 let pointerX = 0;
 let pointerY = 0;
 const clampView = (value: number, low: number, high: number): number =>
   Math.max(low, Math.min(high, value));
+function updateCameraFrame(red: Fighter, blue: Fighter, frameSeconds: number): void {
+  const mid = new Vector3((red.x + blue.x) / 2, 0.75, (red.z + blue.z) / 2);
+  const focus = mid.add(new Vector3(0, cameraFocusY, 0));
+  const separationX = red.x - blue.x;
+  const separationZ = red.z - blue.z;
+  const aspect = engine.getRenderWidth() / Math.max(engine.getRenderHeight(), 1);
+  const verticalFov =
+    camera.fovMode === Camera.FOVMODE_VERTICAL_FIXED
+      ? camera.fov
+      : 2 * Math.atan(Math.tan(camera.fov / 2) / aspect);
+  const horizontalFov =
+    camera.fovMode === Camera.FOVMODE_VERTICAL_FIXED
+      ? 2 * Math.atan(Math.tan(camera.fov / 2) * aspect)
+      : camera.fov;
+  const verticalHalfAngle = Math.max(0.025, verticalFov / 2 - 0.05);
+  const horizontalHalfAngle = Math.max(0.025, horizontalFov / 2 - 0.05);
+  const sinYaw = Math.sin(cameraYaw);
+  const cosYaw = Math.cos(cameraYaw);
+  const sinPitch = Math.sin(cameraPitch);
+  const cosPitch = Math.cos(cameraPitch);
+  // This shared radius covers the current vendored bodies in any camera orbit;
+  // each fighter's measured height comes from the roster.
+  const fighterRadius = 0.97;
+  const fighterTop = Math.max(fighterById(red.id).height, fighterById(blue.id).height);
+  const sideSeparation = Math.abs(separationX * cosYaw + separationZ * sinYaw) / 2;
+  const groundUpSeparation =
+    Math.abs(-separationX * sinYaw + separationZ * cosYaw) * sinPitch * 0.5;
+  const depthSeparation = Math.abs(separationX * sinYaw - separationZ * cosYaw) * cosPitch * 0.5;
+  const bodyVerticalExtent = Math.max(0.75, fighterTop - 0.75);
+  const horizontalExtent = sideSeparation + fighterRadius;
+  const verticalExtent =
+    bodyVerticalExtent * cosPitch + groundUpSeparation + fighterRadius * sinPitch + 0.15;
+  const fighterDepthRadius = fighterRadius * cosPitch + bodyVerticalExtent * sinPitch + 0.15;
+  const depthExtent = depthSeparation + fighterDepthRadius;
+  // Perspective fit uses each camera-space screen axis and adds the nearest
+  // fighter depth. The prior circumscribed-sphere fit charged the diagonal
+  // silhouette radius to the narrower FOV on both axes, shrinking the fighters
+  // unnecessarily in ordinary landscape play.
+  const framingDistance = Math.max(
+    depthExtent + horizontalExtent / Math.tan(horizontalHalfAngle),
+    depthExtent + verticalExtent / Math.tan(verticalHalfAngle),
+  );
+  const zoomDistance = 1 + (cameraZoom - MIN_MATCH_CAMERA_ZOOM) * 0.7;
+  const radius = Math.max(5.5, framingDistance) * zoomDistance;
+  const desired = focus.add(
+    new Vector3(sinYaw * cosPitch * radius, sinPitch * radius, -cosYaw * cosPitch * radius),
+  );
+  // Frame the fighters immediately when their assets first become visible;
+  // otherwise the initial camera position leaves them small while it eases in.
+  // Live tracking responds quickly to resize and movement while bounding each
+  // rendered camera step to preserve comfort. Debug transitions snap after
+  // batched ticks so deterministic captures land directly on their fixture.
+  if (debug || !cameraFramed) camera.position.copyFrom(desired);
+  else {
+    const delta = desired.subtract(camera.position);
+    const follow = 1 - Math.exp(-12 * frameSeconds);
+    const fraction = Math.min(follow, 1.8 / Math.max(delta.length(), 1e-9));
+    camera.position.addInPlace(delta.scale(fraction));
+  }
+  cameraFramed = true;
+  camera.setTarget(focus);
+}
 canvas.addEventListener("pointerdown", (event) => {
   dragging = true;
   pointerX = event.clientX;
@@ -430,7 +522,11 @@ canvas.addEventListener(
   "wheel",
   (event) => {
     event.preventDefault();
-    cameraZoom = clampView(cameraZoom + Math.sign(event.deltaY) * 0.08, 0.85, 1.5);
+    cameraZoom = clampView(
+      cameraZoom + Math.sign(event.deltaY) * 0.08,
+      matchPaused ? MIN_PAUSED_CAMERA_ZOOM : MIN_MATCH_CAMERA_ZOOM,
+      MAX_CAMERA_ZOOM,
+    );
   },
   { passive: false },
 );
@@ -445,6 +541,7 @@ window.addEventListener("keydown", (e) => {
       "KeyK",
       "KeyL",
       "KeyI",
+      "KeyP",
       "KeyR",
       "KeyQ",
       "KeyE",
@@ -460,7 +557,10 @@ window.addEventListener("keydown", (e) => {
     ].includes(e.code)
   )
     e.preventDefault();
+  const wasDown = keys.has(e.code);
   keys.add(e.code);
+  if (!wasDown && fighterChooser.isConfirmed && (e.code === "KeyP" || e.code === "Space"))
+    setMatchPaused(!matchPaused);
   updateSelectionInput();
 });
 window.addEventListener("keyup", (e) => {
@@ -474,6 +574,10 @@ window.addEventListener("blur", () => {
 document
   .querySelector<HTMLButtonElement>("#restart")
   ?.addEventListener("click", () => restartMatch());
+pauseMatch.addEventListener("click", () => {
+  if (!fighterChooser.isConfirmed) return;
+  setMatchPaused(!matchPaused);
+});
 function playerAction(): Action {
   if (
     fighterChooser.blockActionsUntilRelease(mapSelectionInput(keys, navigator.getGamepads?.()[0]))
@@ -508,6 +612,7 @@ function hud(): void {
     status: status!,
   });
   changeFighter!.hidden = match.phase !== "matchOver";
+  pauseMatch!.hidden = !fighterChooser.isConfirmed;
 }
 let last = performance.now();
 function resetPairPresentation(): void {
@@ -584,6 +689,7 @@ function loadCurrentPair(): void {
           if (mesh.getTotalVertices() > 0) shadowGenerator.addShadowCaster(mesh);
         }
       }
+      if (matchPaused) syncSceneAnimationPlayback();
       pendingModelPair = null;
       clearModelLoadFailure();
       resetPairPresentation();
@@ -635,20 +741,30 @@ engine.runRenderLoop(() => {
     Number(keys.has("KeyQ")) +
     (Math.abs(stickX) > 0.2 && Number.isFinite(stickX) ? stickX : 0);
   const orbitY = Math.abs(stickY) > 0.2 && Number.isFinite(stickY) ? stickY : 0;
+  const pageDirection = Number(keys.has("PageUp")) - Number(keys.has("PageDown"));
+  const panning = matchPaused && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
+  if (panning)
+    cameraFocusY = clampView(cameraFocusY + pageDirection * frameSeconds * 0.8, -0.4, 1.3);
   cameraYaw += clampView(orbitX, -1, 1) * frameSeconds * 1.6;
   cameraPitch = clampView(
-    cameraPitch +
-      (Number(keys.has("PageUp")) - Number(keys.has("PageDown"))) * frameSeconds * 0.8 -
-      orbitY * frameSeconds * 0.9,
+    cameraPitch + (panning ? 0 : pageDirection) * frameSeconds * 0.8 - orbitY * frameSeconds * 0.9,
     0.3,
     0.85,
   );
   cameraZoom = clampView(
     cameraZoom +
       (Number(keys.has("BracketLeft")) - Number(keys.has("BracketRight"))) * frameSeconds * 0.8,
-    0.85,
-    1.5,
+    matchPaused ? MIN_PAUSED_CAMERA_ZOOM : MIN_MATCH_CAMERA_ZOOM,
+    MAX_CAMERA_ZOOM,
   );
+  if (matchPaused) {
+    accumulator = 0;
+    const [red, blue] = match.fighters;
+    updateCameraFrame(red, blue, frameSeconds);
+    hud();
+    scene.render();
+    return;
+  }
   updateSelectionInput();
   if (!fighterChooser.isConfirmed) accumulator = 0;
   while (!debug && fighterChooser.isConfirmed && accumulator >= 1 / 60) {
@@ -672,65 +788,7 @@ engine.runRenderLoop(() => {
     banner.remaining = Math.max(0, banner.remaining - frameSeconds);
     banner.root.hidden = banner.remaining === 0;
   }
-  const mid = new Vector3((red.x + blue.x) / 2, 0.75, (red.z + blue.z) / 2);
-  const separationX = red.x - blue.x;
-  const separationZ = red.z - blue.z;
-  const aspect = engine.getRenderWidth() / Math.max(engine.getRenderHeight(), 1);
-  const verticalFov =
-    camera.fovMode === Camera.FOVMODE_VERTICAL_FIXED
-      ? camera.fov
-      : 2 * Math.atan(Math.tan(camera.fov / 2) / aspect);
-  const horizontalFov =
-    camera.fovMode === Camera.FOVMODE_VERTICAL_FIXED
-      ? 2 * Math.atan(Math.tan(camera.fov / 2) * aspect)
-      : camera.fov;
-  const verticalHalfAngle = Math.max(0.025, verticalFov / 2 - 0.05);
-  const horizontalHalfAngle = Math.max(0.025, horizontalFov / 2 - 0.05);
-  const sinYaw = Math.sin(cameraYaw);
-  const cosYaw = Math.cos(cameraYaw);
-  const sinPitch = Math.sin(cameraPitch);
-  const cosPitch = Math.cos(cameraPitch);
-  // This shared radius covers the current vendored bodies in any camera orbit;
-  // each fighter's measured height comes from the roster.
-  const fighterRadius = 0.97;
-  const fighterTop = Math.max(fighterById(red.id).height, fighterById(blue.id).height);
-  const sideSeparation = Math.abs(separationX * cosYaw + separationZ * sinYaw) / 2;
-  const groundUpSeparation =
-    Math.abs(-separationX * sinYaw + separationZ * cosYaw) * sinPitch * 0.5;
-  const depthSeparation = Math.abs(separationX * sinYaw - separationZ * cosYaw) * cosPitch * 0.5;
-  const bodyVerticalExtent = Math.max(0.75, fighterTop - 0.75);
-  const horizontalExtent = sideSeparation + fighterRadius;
-  const verticalExtent =
-    bodyVerticalExtent * cosPitch + groundUpSeparation + fighterRadius * sinPitch + 0.15;
-  const fighterDepthRadius = fighterRadius * cosPitch + bodyVerticalExtent * sinPitch + 0.15;
-  const depthExtent = depthSeparation + fighterDepthRadius;
-  // Perspective fit uses each camera-space screen axis and adds the nearest
-  // fighter depth. The prior circumscribed-sphere fit charged the diagonal
-  // silhouette radius to the narrower FOV on both axes, shrinking the fighters
-  // unnecessarily in ordinary landscape play.
-  const framingDistance = Math.max(
-    depthExtent + horizontalExtent / Math.tan(horizontalHalfAngle),
-    depthExtent + verticalExtent / Math.tan(verticalHalfAngle),
-  );
-  const zoomDistance = 1 + (cameraZoom - 0.85) * 0.7;
-  const radius = Math.max(5.5, framingDistance) * zoomDistance;
-  const desired = mid.add(
-    new Vector3(sinYaw * cosPitch * radius, sinPitch * radius, -cosYaw * cosPitch * radius),
-  );
-  // Frame the fighters immediately when their assets first become visible;
-  // otherwise the initial camera position leaves them small while it eases in.
-  // Live tracking responds quickly to resize and movement while bounding each
-  // rendered camera step to preserve comfort. Debug transitions snap after
-  // batched ticks so deterministic captures land directly on their fixture.
-  if (debug || !cameraFramed) camera.position.copyFrom(desired);
-  else {
-    const delta = desired.subtract(camera.position);
-    const follow = 1 - Math.exp(-12 * frameSeconds);
-    const fraction = Math.min(follow, 1.8 / Math.max(delta.length(), 1e-9));
-    camera.position.addInPlace(delta.scale(fraction));
-  }
-  cameraFramed = true;
-  camera.setTarget(mid);
+  updateCameraFrame(red, blue, frameSeconds);
   hud();
   scene.render();
 });

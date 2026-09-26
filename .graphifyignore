@@ -1,6 +1,8 @@
 # Universal paths outside production code maps
 tests/
-devel/
+!devel/
+devel/*
+!devel/roster_candidates/
 tools/
 docs/
 site/

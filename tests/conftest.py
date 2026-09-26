@@ -10,13 +10,10 @@ if _repo_root not in sys.path:
 	sys.path.insert(0, _repo_root)
 
 
-# Exclude both end-to-end tiers from pytest collection. tests/playwright/
-# holds browser-driven tests (Playwright), and tests/e2e/ holds heavier
-# shell/Python whole-system runners. Both run outside pytest -- see
-# docs/PLAYWRIGHT_USAGE.md and docs/E2E_TESTS.md.
-# tests/_temp/ stays collectable so pytest-suitable temporary test_*.py files
-# run in the normal fast lane. Heavier temporary checks run explicitly.
-collect_ignore = ["e2e", "playwright"]
+# Exclude non-pytest test tiers and disposable authoring evidence from pytest
+# collection. Browser and end-to-end runners execute explicitly; _temp is not
+# a permanent test lane.
+collect_ignore = ["_temp", "e2e", "playwright"]
 
 
 # REPO_HYGIENE_FILTERS is the repo-local hygiene-exclusion registry (Layer 2).
@@ -38,18 +35,21 @@ collect_ignore = ["e2e", "playwright"]
 #   - Recursive directory exclusions need an explicit /** because fnmatch's *
 #     does not cross "/". Use "temp_scripts/**" to exclude a whole subtree.
 #
-# This template has no repo-specific exclusions, so the registry is empty.
+# Roster candidate scripts are retained provenance for asset authoring, not
+# maintained application Python, so hygiene linters do not treat them as such.
 # Cross-overlay doc references (a template doc naming a doc that ships from a
 # different overlay or the universal docs/ tree) use a backticked name, not a
 # markdown link: no single relative link is valid both in the split template
 # tree and in the flattened consumer repo.
-# Example entries (commented out; this repo needs none):
+# Example per-test entries:
 #   REPO_HYGIENE_FILTERS = {
 #       "all": ["temp_scripts/**", "TEMPLATE.py"],
 #       "ascii_compliance": ["human_readable-*.html"],
 #       "pyflakes_code_lint": ["devel/scratch_*.py"],
 #   }
-REPO_HYGIENE_FILTERS = {}
+REPO_HYGIENE_FILTERS = {
+	"all": ["devel/roster_candidates/**"],
+}
 
 
 # === OPTIONAL_HELPERS_MENU ===

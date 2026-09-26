@@ -102,9 +102,9 @@ The revision follows a review. That review asked to:
 - Rebuild the chooser as a grouped card grid with 2-D navigation.
 - Choose the opponent with the seeded random source from unlocked fighters.
 - Load fighters lazily, two instances per match.
-- Ship McClintock end to end first, then integrate the rest of the roster in waves while her
-  lessons improve the shared modules.
-- Run a seeded AI tournament as a gross-balance diagnostic.
+- Use McClintock's reopened visual gate to improve the shared authoring loop while independent
+  fighters continue to integrate as their own body and unlock prerequisites clear.
+- Run a seeded AI tournament to investigate observed gameplay outliers.
 
 ## Non-goals
 
@@ -131,11 +131,11 @@ This summary records the original design before roster refactoring.
   resolves skeletal nodes and clones native animation groups.
   - Every registered body has the canonical ordered 66-joint Mesh2Motion skeleton; the rig-boundary
     test enforces that contract and complete clip targets.
-  - Curie uses the CC0 Mesh2Motion `female_31` body. The incompatible `curie_period` rig remains
-    retired provenance and is not in the model manifest.
+  - At this historical point Curie used the CC0 Mesh2Motion `female_31` body. The current registry
+    has since moved Curie to the reviewed `mesh2motion_curie_period.glb` asset.
   - Warburg has a bone-parented prop.
-- Available CC0 bodies: `doctor_m`, `female_9`, `female_31`, and the unshipped `male_5`;
-  `curie_period` is a retired candidate.
+- Available CC0 bodies at that historical point were `doctor_m`, `female_9`, `female_31`, and the
+  unshipped `male_5`; the current registry also ships the reviewed `curie_period` body.
 - Unlock storage: `nobel-combat.franklin-unlock.v1`. The storage module was added in commit
   `79a6aff` on 2026-09-24. The last recorded Pages success is commit `ccaf03d` on 2026-09-23,
   which predates it. Any v1 records are therefore at most about a day old, from playtests.
@@ -189,13 +189,13 @@ This summary records the original design before roster refactoring.
 | M11 | Special effects and captions | Procedural shapes, HUD name and caption on every release | Specials loud and funny |
 | M12 | Generic AI | Profile interpreter replaces role branches | AI scales |
 | M13 | Unlock v2 | Clean v2 rules, storage, progression, announcements | Unlock tree logic live |
-| M14 | McClintock end-to-end fighter | First new fighter shipped; friction feeds shared modules | Architecture strengthened |
+| M14 | McClintock end-to-end fighter | First new fighter integrated; current body is under a reopened visual gate | Shared authoring loop strengthened |
 | M15 | Originals on meter | Warburg, Curie, Franklin get 3 specials each; chords retired | One rule for all |
 | M16 | Super card | Tier-3 title card | Supers celebrate research |
 | M17 | Chooser grid | Grouped cards, 2-D navigation, locked cards, detail pane | Chooser scales |
 | M18 | Opponent selection | Seeded pick from unlocked fighters | Varied matches |
 | M19 | Appearance kits | Kit builder scoped by M3 findings | Distinct looks |
-| M20 | Native rig adaptation | Curie uses the canonical `female_31` body; direct clip cloning | Safe body variants |
+| M20 | Native rig adaptation | Curie uses the reviewed canonical-rig period body; direct clip cloning | Safe body variants |
 | M21 | Roster smoke harness | Permanent roster smoke spec plus temporary capture script | Scalable validation |
 | M22-M31 | Waves 1-5 | Per wave: b = models, c = fighters | Roster shipped |
 | M32 | Balance diagnostic | Seeded tournament with a shared AI profile | Gross outliers fixed |
@@ -215,12 +215,13 @@ M2 -> M5 -> M6 -> M7 -> {M8, M9} ; M9 -> M10 -> {M11, M12} ; M5 -> M13
 M11 -> {M15, M16} ; {M14, M15} -> distinctiveness check
 {M13, M16} -> M17 -> M18
 {M18, M19, M20} -> M21
-M21 -> wave b milestones (any order) ; wave c: M23 -> M25 -> M27 -> M29 -> M31
-each wave c also needs its own wave b ; M31 -> M32 -> M33
+M21 -> each fighter's body gate (any order)
+each fighter's body gate + that fighter's direct unlock prerequisites -> that fighter's FighterDef
+all fighter FighterDefs -> M32 -> M33
 ```
 
-Critical path: M1, M2, M5-M7, M9, M10, M11, M14 (also waits for M8 via M19), M16, M17, M18, M21, the wave c
-chain, M32, M33.
+Critical path: M1, M2, M5-M7, M9, M10, M11, M14 (also waits for M8 via M19), M16, M17, M18, M21, the
+last fighter body-and-unlock path, M32, M33.
 
 ### Milestone: M1 docs baseline
 
@@ -565,7 +566,7 @@ chain, M32, M33.
 
 ### Milestone: M14 McClintock end-to-end fighter
 
-This is the first new fighter shipped: an implementation milestone, not a go/no-go gate. Its
+This was the first new fighter integration: an implementation milestone, not a go/no-go gate. Its
 friction report feeds fixes into the shared modules while M15-M21 and wave research and models
 proceed.
 
@@ -601,7 +602,9 @@ proceed.
   - A temporary capture of her 3 specials passes `image_evaluator` review against her dossier's
     defining features.
   - Her appearance passes the same match-camera visual gate required for wave bodies: both ordinary
-    roster positions, idle through getup, with every defining cue readable and no detached geometry.
+    roster positions, idle through getup, with a readable, distinct caricature and no detached
+    geometry. Source photos guide the recognizable cues; they are not a portrait-reconstruction
+    checklist.
     The current status and failed generic-kit experiment are recorded in
     `docs/active_plans/reports/vertical_slice_report.md`; M14 remains open until this criterion
     passes or the visual contract is explicitly revised.
@@ -714,7 +717,8 @@ proceed.
     friction from M14 returns to WS-RIG as `WP-M14-F<n>`.
   - Warburg's gauge becomes a prop entry.
   - Body height scaling comes from `FighterDef.height`.
-  - `male_5` and `female_31` are promoted into the manifest when used.
+  - `male_5` and any later accepted body are promoted into the manifest when registered. Curie's
+    registered period asset is the current route; `female_31` is not promoted for Curie.
 - Workstreams: WS-RIG.
 - Entry criteria: M8 exit.
 - Exit criteria: G1; a temporary capture of every piece on two bodies passes the `image_evaluator`
@@ -729,8 +733,8 @@ proceed.
     Mesh2Motion skeleton and each required clip targets that complete skeleton.
   - Use `src/rig/clips.ts` for direct clip cloning; do not select runtime retarget maps by fighter
     or body id.
-  - Curie uses the CC0 Mesh2Motion `female_31` body on the native skeleton. The separately rigged
-    period-dress candidate remains documented as retired provenance.
+  - Curie uses the reviewed `mesh2motion_curie_period.glb` body on the native skeleton. The
+    `female_31` asset remains donor/provenance material and is not Curie's runtime route.
   - `test_rig_boundary.mjs` checks every unique roster body against the canonical skeleton and each
     clip against its complete ordered joint set.
   - Reject differently rigged candidates. A future body variation must use the canonical skeleton
@@ -772,22 +776,40 @@ Research for every wave is already done in M4. Each wave has two milestones:
   - Depends on M21. A wave's b milestone may run as early as M21 exit, in parallel with earlier
     waves' c milestones.
   - Deliverables:
-    - A Tier A authored canonical-rig body asset supplies every defining hair, clothing, and
-      silhouette cue.
+    - A canonical-rig body asset preserves the richest compatible licensed donor mesh and materials
+      that can support the fighter's source-backed appearance. Add only the missing readable cues;
+      author a full body only when no available donor can meet the visual bar.
     - Tier B kit data uses only supported rigid head or prop accessories. It independently passes
       this wave's source-cue, two-position, and eight-state review.
     - A temporary capture scored by `image_evaluator` against the dossier's defining features in
       both ordinary roster positions: rear-facing player slot and front-facing opponent slot.
       Each position includes idle, move, light, heavy, block, hit, down, and getup states.
-  - Pass condition: every source-defined feature is visible in an ordinary gameplay view, the
-    silhouette is distinct from the shipped lineup, and the silhouette and pose remain coherent in
-    both positions across all eight states, especially down and getup.
-  - Correction: at most 2 revisions, then replace a failed candidate with an authored canonical-rig
-    body. Tier B cannot substitute generic hair, clothes, or silhouette geometry.
-  - One lane per fighter; an `integrator` owns the manifest and `assets/README.md`.
+  - Pass condition: a sufficient combination of source-supported face, hair, and silhouette cues is
+    readable in an ordinary gameplay view, the fighter is distinct from the shipped lineup, and the
+    silhouette and pose remain coherent in both positions across all eight states, especially down
+    and getup. Curie and Warburg set the intended fidelity: a fun, recognizable caricature, rather
+    than a portrait reconstruction.
+  - Correction: at most 2 focused appearance revisions for one approach, then compare a simpler
+    cleaned donor or choose a stronger donor. Appearance kits cannot substitute generic hair,
+    clothes, or silhouette geometry.
+  - After a candidate passes, the integrator copies its exact SHA-named capture GLB to
+    `assets/models/` and adds a provenance row to `assets/README.md` marked accepted but
+    unregistered. `MANIFEST.txt` remains generated exclusively from `FighterDef.body`; it is not
+    edited by the model wave. The fighter wave adds the body path and regenerates the manifest,
+    which is when the Pages build starts shipping that model.
+  - One lane per fighter; an `integrator` owns accepted asset records, the roster registry, and
+    manifest generation. Shared files have one owner.
+- Use the [NEW_CHARACTER_RECIPE.md](../NEW_CHARACTER_RECIPE.md) for the source, body-authoring,
+  capture, review, and handoff checklist in each fighter lane.
 - **c, fighters**: M23, M25, M27, M29, M31.
-  - Depends on the wave's own b milestone and the previous wave's c milestone. Unlock prerequisites
-    must exist before a fighter's rule references them.
+  - Each fighter lane is ready independently when its own body has passed the visual and rig gate,
+    its exact accepted asset and provenance record are available, and every direct `FighterDef`
+    prerequisite named by that fighter's actual unlock rule already exists in the registry. It does
+    not wait for another fighter in its model wave, a previous fighter wave, or an arbitrary wave
+    milestone.
+  - A wave-c milestone closes only after every fighter assigned to it has integrated. Its closure
+    does not gate any other fighter lane. Preserve the unlock tree: do not change an unlock rule to
+    bypass an unfinished prerequisite.
   - Deliverables: `FighterDef` entries in the category data file, using M2's encoded specials, the
     M4 captions, an AI profile, and the unlock rule.
   - Exit: G2, plus a temporary seeded 20-match run of each new fighter against Warburg in which
@@ -801,7 +823,7 @@ supported rigid accessories meet the same visual gate; it is not a generic-body 
 
 | Wave | Fighters |
 | --- | --- |
-| 1 (M22-M23) | Hodgkin, Goodenough, Buck (McClintock shipped in M14) |
+| 1 (M22-M23) | Hodgkin, Goodenough, Buck (McClintock integrated in M14 and currently reopened for visual replacement) |
 | 2 (M24-M25) | Doudna, Tsien, Strickland, Levi-Montalcini, Bertozzi |
 | 3 (M26-M27) | Baker, Steitz, Frank, Anfinsen, Blackburn |
 | 4 (M28-M29) | Kariko, Altman, Cech, Baltimore |
@@ -821,15 +843,18 @@ supported rigid accessories meet the same visual gate; it is not a generic-body 
        per 100 meter spent, compared with the budget rule. Delivered value far from budget means a
        mechanical problem, so tune the special's data.
     2. Tournaments. A round-robin runs twice: once with every fighter on one shared default AI
-       profile, and once with each fighter's own profile. Flag a fighter whose field win rate is
-       under 25% or over 75%, which is a gross outlier a player would notice.
+       profile, and once with each fighter's own profile. Investigate a conspicuous distribution
+       outlier or a result that conflicts with an observed playtest; record the comparison and the
+       corrective action, if one is warranted.
   - Classification:
     - Scripted exercise off budget: kit problem. Tune the special data.
-    - On budget, but flagged only with its own profile: usage problem. Tune the AI profile.
-    - On budget, but flagged in both tournaments: inspect the kit geometry (range and movement),
+    - On budget, but anomalous only with its own profile: usage problem. Tune the AI profile.
+    - On budget, but anomalous in both tournaments: inspect the kit geometry (range and movement),
       then tune stats.
-  - Iterate up to 3 rounds. Residual flags are recorded in the changelog as follow-ups.
-  - This is not a competitive ranking. Both the budget and the band only expose obvious mistakes.
+  - Continue only while a measured problem has a concrete corrective action. Residual findings are
+    recorded in the changelog as follow-ups.
+  - This is not a competitive ranking. The diagnostic exposes evidence for investigation, not a
+    mandatory numerical band.
     A fighter recorded as intentionally lopsided in its dossier keeps that personality and is not
     normalized; Warburg is the example.
 - Workstreams: WS-BAL. The tournament runner has one owner; tuning has one lane per category file.
@@ -1000,8 +1025,13 @@ Permanent tests. Each one protects a contract that players or data rely on:
 | `test_unlocks.mjs` | v2 decode, rejection of bad records, unlock rules |
 | `roster_smoke.spec.ts` | Every fighter loads, releases a special, and renders without errors |
 | `input_parity.spec.ts` (updated) | Special maps identically on keyboard and gamepad |
+| `pause_match.spec.ts` | P, Space, and the button freeze combat while paused view controls remain usable |
+| `chooser_grid.spec.ts` portrait case | Every rendered fighter card can load its runtime face-and-hair portrait |
+| `test_candidate_body_contract.mjs` | Candidate preflight rejects malformed or noncanonical body assets before capture |
 
-- Existing specs are updated rather than multiplied; literal counts become roster-derived.
+- Update existing specs when they already own a stable behavior; add a focused test file only for a
+  demonstrated independent contract, such as pause behavior or candidate-body preflight. Literal
+  roster counts remain derived from the registry.
 - Tracked working artifacts are not permanent tests. They are consumed across milestones and
   closed out in M33:
   - `src/roster/special_drafts.ts`, deleted when empty;
@@ -1013,7 +1043,8 @@ Permanent tests. Each one protects a contract that players or data rely on:
   - `image_evaluator` reports;
   - the wave 20-match runs;
   - the tournament.
-- No pixel, byte, or elapsed-time assertions.
+- No pixel, byte-equivalence, or elapsed-time assertions decide visual quality. SHA values identify
+  the exact candidate and served asset reviewed; they are provenance evidence, not appearance tests.
 - Likeness is judged by `image_evaluator` against the dossier's written features.
 
 ## Risk register
