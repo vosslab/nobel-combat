@@ -53,7 +53,11 @@ test("chooser grid keeps its columns, Franklin secrecy, detail, and vertical nav
   const dialog = page.getByRole("dialog", { name: "Choose your fighter" });
   await expect(dialog).toBeVisible();
   await expect(page.locator('[value="franklin"]')).toHaveCount(0);
-  await expect(page.locator(".fighter-choice-locked")).toHaveCount(0);
+  const doudnaLocked = page
+    .locator(".fighter-choice-locked")
+    .filter({ hasText: "Jennifer Doudna" });
+  await expect(doudnaLocked).toHaveCount(1);
+  await expect(page.getByRole("radio", { name: /Jennifer Doudna/ })).toHaveCount(0);
   await expect(page.locator("#fighter-detail")).toContainText(
     "Nobel Prize in Physiology or Medicine 1931",
   );
@@ -61,15 +65,30 @@ test("chooser grid keeps its columns, Franklin secrecy, detail, and vertical nav
   await expect(
     page.getByRole("link", { name: "Read about Otto Heinrich Warburg" }),
   ).toHaveAttribute("target", "_blank");
+  const initialId = await page.locator('input[name="fighter"]:checked').inputValue();
+  const initialBox = await page.locator(`label:has(input[value="${initialId}"])`).boundingBox();
+  expect(initialBox).not.toBeNull();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
+  const keyboardDownId = await page.locator('input[name="fighter"]:checked').inputValue();
+  expect(keyboardDownId).not.toBe(initialId);
+  const keyboardDownBox = await page
+    .locator(`label:has(input[value="${keyboardDownId}"])`)
+    .boundingBox();
+  expect(keyboardDownBox).not.toBeNull();
+  expect(keyboardDownBox!.y).toBeGreaterThan(initialBox!.y);
   await page.keyboard.press("ArrowUp");
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  await expect(page.locator(`input[name="fighter"][value="${initialId}"]`)).toBeChecked();
   await setGamepad(page, pad([13]));
-  await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
+  const gamepadDownId = await page.locator('input[name="fighter"]:checked').inputValue();
+  expect(gamepadDownId).not.toBe(initialId);
+  const gamepadDownBox = await page
+    .locator(`label:has(input[value="${gamepadDownId}"])`)
+    .boundingBox();
+  expect(gamepadDownBox).not.toBeNull();
+  expect(gamepadDownBox!.y).toBeGreaterThan(initialBox!.y);
   await setGamepad(page, null);
   await setGamepad(page, pad([12]));
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  await expect(page.locator(`input[name="fighter"][value="${initialId}"]`)).toBeChecked();
 });
 
 test("chooser cards load a face-first portrait for every rendered fighter", async ({

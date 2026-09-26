@@ -72,9 +72,6 @@ async function setInput(page, device, action, heldKeys) {
     }
   }
 }
-function selectedRoles() {
-  return ["curie", "warburg"];
-}
 async function waitForNeutralFrame(page) {
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
@@ -82,29 +79,44 @@ async function waitForNeutralFrame(page) {
 }
 async function confirmFighter(page, device) {
   await page.waitForSelector("#start-match");
+  const selectableIds = await page
+    .locator('input[name="fighter"]')
+    .evaluateAll((inputs) => inputs.map((input) => input.value));
+  const initialPlayerId = await page.locator('input[name="fighter"]:checked').inputValue();
   if (device === "keyboard") {
-    await page.waitForFunction(() => document.querySelector("#select-warburg")?.checked === true);
     await page.keyboard.press("ArrowRight");
-    await page.waitForFunction(() => document.querySelector("#select-curie")?.checked === true);
+    await page.waitForFunction(
+      (initialId) => document.querySelector('input[name="fighter"]:checked')?.value !== initialId,
+      initialPlayerId,
+    );
     await page.keyboard.press("Enter");
   } else {
     await page.evaluate(() => (window.__testPad.axes = [1, 0]));
-    await page.waitForFunction(() => document.querySelector("#select-curie")?.checked === true);
+    await page.waitForFunction(
+      (initialId) => document.querySelector('input[name="fighter"]:checked')?.value !== initialId,
+      initialPlayerId,
+    );
     await page.evaluate(() => (window.__testPad.axes = [0, 0]));
     await page.waitForTimeout(40);
     await page.evaluate(() => (window.__testPad.buttons[0].pressed = true));
     await page.waitForFunction(() => !document.querySelector("#fighter-select")?.open);
     await page.evaluate(() => (window.__testPad.buttons[0].pressed = false));
   }
+  const playerId = await page.locator('input[name="fighter"]:checked').inputValue();
   await page.waitForFunction(
-    (roles) =>
-      window
-        .__fightSnapshot?.()
-        .fighters.map((fighter) => fighter.id)
-        .join(",") === roles.join(","),
-    selectedRoles(),
+    ({ selectedPlayer, eligibleIds }) => {
+      const fighters = window.__fightSnapshot?.().fighters;
+      return (
+        fighters?.length === 2 &&
+        fighters[0]?.id === selectedPlayer &&
+        fighters[1]?.id !== selectedPlayer &&
+        eligibleIds.includes(fighters[1]?.id)
+      );
+    },
+    { selectedPlayer: playerId, eligibleIds: selectableIds },
   );
   await waitForNeutralFrame(page);
+  return (await snapshot(page)).fighters.map((fighter) => fighter.id);
 }
 async function run(device, desired) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -128,7 +140,7 @@ async function run(device, desired) {
     if (m.type() === "error") errors.push(m.text());
   });
   await page.goto(liveUrl());
-  await confirmFighter(page, device);
+  const expectedRoles = await confirmFighter(page, device);
   let s;
   for (let i = 0; i < 40; i++) {
     s = await snapshot(page);
@@ -193,7 +205,6 @@ async function run(device, desired) {
     await page.keyboard.up("r");
   }
   const restarted = await snapshot(page);
-  const expectedRoles = selectedRoles();
   const result = {
     device,
     inputPlan: desired === "red" ? "player-attacks" : "neutral",

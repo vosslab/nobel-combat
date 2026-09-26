@@ -1,11 +1,30 @@
 import type { AppearanceKit } from "../src/roster/fighter_def";
 
-const supportedAccessories: AppearanceKit = {
-  glasses: "wire",
+const supportedWireAccessories: AppearanceKit = {
+  glasses: { style: "wire" },
   facialHair: "chinStrap",
   prop: "manometer",
 };
-void supportedAccessories;
+void supportedWireAccessories;
+
+const supportedRectangularAccessories: AppearanceKit = {
+  glasses: { style: "rectangular", offset: [0.01, -0.005, 0.02] },
+};
+void supportedRectangularAccessories;
+
+const legacyWireGlasses: AppearanceKit = {
+  // @ts-expect-error Glasses styles carry their rigid-kit fit with the fighter appearance.
+  glasses: "wire",
+};
+void legacyWireGlasses;
+
+const unsupportedGlassesStyle: AppearanceKit = {
+  glasses: {
+    // @ts-expect-error The kit has only the reviewed wire and rectangular frame styles.
+    style: "round",
+  },
+};
+void unsupportedGlassesStyle;
 
 const unsupportedChest: AppearanceKit = {
   // @ts-expect-error Garment overlays are not stable across combat poses.

@@ -56,7 +56,12 @@ async function waitForNeutralFrame(page) {
 }
 async function confirmFighter(page, device) {
   await page.waitForSelector("#start-match");
-  await page.waitForFunction(() => document.querySelector("#select-warburg")?.checked === true);
+  const selectableIds = await page
+    .locator('input[name="fighter"]')
+    .evaluateAll((inputs) => inputs.map((input) => input.value));
+  const initialPlayerId = await page.locator('input[name="fighter"]:checked').inputValue();
+  if (!selectableIds.includes(initialPlayerId))
+    throw new Error(`Chooser selected unavailable fighter: ${initialPlayerId}`);
   if (device === "keyboard") {
     await page.keyboard.press("Enter");
   } else {
@@ -64,14 +69,23 @@ async function confirmFighter(page, device) {
     await page.waitForFunction(() => !document.querySelector("#fighter-select")?.open);
     await page.evaluate(() => (window.__testPad.buttons[9].pressed = false));
   }
+  const playerId = await page.locator('input[name="fighter"]:checked').inputValue();
   await page.waitForFunction(
-    () =>
-      window
-        .__fightSnapshot?.()
-        .fighters.map((fighter) => fighter.id)
-        .join(",") === "warburg,curie",
+    ({ selectedPlayer, eligibleIds }) => {
+      const fighters = window.__fightSnapshot?.().fighters;
+      return (
+        fighters?.length === 2 &&
+        fighters[0]?.id === selectedPlayer &&
+        fighters[1]?.id !== selectedPlayer &&
+        eligibleIds.includes(fighters[1]?.id)
+      );
+    },
+    { selectedPlayer: playerId, eligibleIds: selectableIds },
   );
   await waitForNeutralFrame(page);
+  return (await page.evaluate(() => window.__fightSnapshot())).fighters.map(
+    (fighter) => fighter.id,
+  );
 }
 async function run(device) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -101,7 +115,7 @@ async function run(device) {
     if (m.type() === "error") errors.push(m.text());
   });
   await page.goto(liveUrl());
-  await confirmFighter(page, device);
+  const expectedRoles = await confirmFighter(page, device);
   await page.waitForFunction(() => window.__fightSnapshot?.().rigs?.length === 2);
   const observed = new Set();
   let min = 100,
@@ -257,6 +271,7 @@ async function run(device) {
     directionalMove: +(afterDirectional - beforeDirectional).toFixed(2),
     lightHit,
     restart,
+    roles: expectedRoles,
     errors,
   };
   results.push(result);
@@ -280,7 +295,7 @@ if (
       r.errors.length ||
       r.restart.round !== 1 ||
       r.restart.hp.some((h) => h !== 100) ||
-      r.restart.roles.join(",") !== "warburg,curie",
+      r.restart.roles.join(",") !== r.roles.join(","),
   )
 )
   process.exitCode = 1;

@@ -4,6 +4,58 @@
 
 ### Additions and New Features
 
+- Removed the legacy `/devel/__pycache__/` ignore rule so generated Python
+  bytecode remains visible for diagnosis. Python authoring continues to use
+  `source_me.sh` with `PYTHONDONTWRITEBYTECODE=1`.
+
+- Corrected vertical fighter selection to compare the visible card positions,
+  so long names and portrait layouts cannot split one card row into false
+  navigation rows through their inline radio controls.
+
+- Prepared one source-only John Bardeen direction from the detailed native
+  `male_32` donor. It preserves the donor unchanged for a single direct head and
+  gameplay proof of the receding crown and round wire-glasses cue; no model,
+  manifest, portrait, registry, or fighter change occurred.
+
+- Added Donna Strickland as a playable Physics 2018 fighter. Her sealed
+  police-female donor body (`b5cf7cea7644c1a5409d46b27dd748f110171534d796649307d180705520b02e`)
+  preserves a detailed feminine face and compact dark hair with blue knitwear;
+  the reviewed rectangular glasses are attached by her fighter-owned appearance
+  kit. Strickland unlocks after a Goodenough win and brings `amplifies`, three
+  chirped-pulse specials, and a ranged AI profile to Physics and Energy.
+
+- Corrected the shared rectangular-glasses geometry so its two lens rims leave
+  a real nose gap instead of placing both inner vertical rims at the center of
+  the face. Strickland's fighter-owned depth fit is now `[0, 0, -0.065]` after
+  the old deep endpoint buried the horizontal and inner rims; her sealed body
+  is unchanged and the refreshed registered-route capture remains subject to
+  independent visual review.
+
+- Added Rita Levi-Montalcini as a playable Medicine 1986 fighter. Her sealed
+  police-female donor body (`dae3ac6588f45352b84a4687a1120ab3c9fd5510b203d4f695093fd0a856b665`)
+  keeps its detailed feminine face and compact dark gathered hair, with a dark
+  formal outer layer and pale collar as supporting cues. Levi-Montalcini unlocks
+  after a Buck win and brings `sprouts`, three growth-factor specials, and a
+  grounded AI profile to Cell Biology and Neuroscience.
+
+- Added Carolyn R. Bertozzi as a playable Chemistry 2022 fighter. Her sealed
+  McClintock-donor body (`73326a01eb7e7782776a2efc04a1649fd34dab8d64d732e8a0b7d0306eeadf1f`)
+  preserves the detailed native feminine face and compact dark hair while using only a charcoal
+  blazer and pale blouse as supporting cues. Bertozzi unlocks after a Curie win and brings
+  `clicks`, three chemical-biology specials, and a grounded AI profile to Chemical Biology.
+
+- Earlier preparation preserved Rita Levi-Montalcini's CC0 police-female donor's native detailed
+  head, hair, weights, and 66-joint rig through one non-head formal/lab material pass before its
+  paused gameplay review. That source-only preparation led to the accepted, playable fighter
+  recorded above.
+
+- Added Roger Y. Tsien as a playable Chemistry 2008 fighter. His sealed simple-donor v3 body
+  (`b2f73fc1dea6395d745427e5f202442a844810ea4e847b6c8496f9b377abb4b5`)
+  preserves the detailed human donor face and hair, uses one coherent navy garment, and receives
+  the reviewed wire glasses through the runtime appearance kit. Tsien unlocks after a Hodgkin win
+  and brings `fluoresces`, three fluorescence specials, and his grounded AI profile to Fluorescence
+  and Imaging.
+
 - Added Jennifer Doudna as a playable Chemistry 2020 fighter. Her sealed
   rich-v5 body (`2baf62bac816b63e8180ef3119d5d9f14985455658b9c6de4b57d9e309dea39a`)
   keeps the detailed donor's native human face, pale shoulder-length hair, and
@@ -18,6 +70,13 @@
   runtime portrait shows the same body. Buck brings her 2004 Nobel record,
   `smells` combat verb, three olfaction specials, AI profile, and starter
   unlock to the Cell Biology and Neuroscience roster category.
+- Added Dorothy Crowfoot Hodgkin as a playable Chemistry 1964 starter. Her
+  sealed Curie-donor v2 body (`48d12664ed7d3262477e9110b3568e9587dc7a44235dab8d9e781c0548ed349a`)
+  preserves a mature human donor face and native rig while using a short gray
+  hair sweep, blue-gray cardigan, ivory blouse, and dark skirt. Two-slot
+  eight-state and served-byte portrait evidence bind the runtime body. Hodgkin
+  brings `diffracts`, three crystallography specials, and her ranged AI profile
+  to Structural Biology and Biochemistry.
 - Recorded the donor-material ownership lesson: when head weights cover both
   face and hair, preserve the combined textured head unless a separately owned
   hair component exists. This avoids recoloring a face while attempting a hair
@@ -25,6 +84,112 @@
 
 ### Fixes and Maintenance
 
+- Removed four generated Python bytecode files from roster authoring paths. The character recipe
+  now uses an in-memory syntax check; its historical Goodenough record identifies `py_compile` as
+  the source of the bytecode and retires it from future authoring guidance.
+
+- Retired David Baker's `male_10` source line after the actual gameplay proof
+  found compact matted hair and facial hair. A direct, read-only component and
+  atlas check established that its visible hair shares the same components with
+  face and beard pixels, so no broad recolor or invented curl geometry was
+  added. The source remains unregistered and excluded from the runtime
+  manifest.
+
+- Made vertical chooser movement preserve a visible card column before using
+  the nearest-card fallback. Locked cards can leave a category row sparse; the
+  old nearest-row choice could move diagonally and make a Down then Up pair
+  select a different original fighter.
+
+- Corrected Joachim Frank's bounded native-bitmap silver-hair source preview.
+  The former lower-left mask mistook a rotated head island for clothing, then
+  whitened jaw/chin facial-hair pixels. The corrected two-island mask recolors
+  only its scalp edges and preserves face, jaw, chin, clothing, UVs, weights,
+  geometry, and the 66-joint rig. The ignored preview artifacts are ready for
+  one paused head-and-hair proof after the roster gate; no GLB, manifest,
+  portrait, roster, or FighterDef changed.
+
+- Kept the live progression check specific to Rosalind Franklin's durable
+  unlock. A Curie win may also announce Carolyn R. Bertozzi, so the check now
+  requires Franklin's announcement only when Franklin unlocks and permits
+  other legitimate roster announcements.
+
+- Prepared one bounded Thomas Steitz doctor_m texture experiment after direct
+  atlas inspection found two face islands with locally maskable gray hair and
+  brown beard pixels. It corrects the old false claim of a native white Steitz
+  beard while preserving skin, eyes, mouth, and glasses in a source-only atlas
+  preview. A first beard-mask diagnostic missed the near-black source pixels;
+  its corrected source-only v5 preview visibly whitens the beard. It leaves
+  Warburg, assets, the manifest, and roster unchanged pending one paused
+  face-first proof.
+
+- Vendored byte-exact CC0 `male_10` as David Baker's one bounded source-only
+  replacement after the native `male_6` head proof failed its curl and
+  clean-shaven cues. The donor is excluded from the generated manifest and
+  awaits one paused gameplay head-and-hair proof before any body, portrait, or
+  FighterDef work.
+
+- Made selected portrait captures retain other fighter receipts. The generated
+  portrait manifest now supports adding or refreshing one registered fighter
+  without discarding the existing roster's byte bindings.
+
+- Corrected the rectangular `AppearanceKit` frame so its vertical edges use
+  horizontal offsets from each lens center. Each lens now renders as a closed
+  rectangular rim instead of placing every edge along the vertical axis.
+- Prepared K. Barry Sharpless's `male_32` donor as source-only evidence for one
+  bounded material pass. It remains unexported and unregistered; no accepted
+  body, portrait, or FighterDef is implied.
+- Simplified Sidney Altman's `male_32` source lane to use the exact native donor. Its existing
+  professional shirt and collar are sufficient; skin influence cannot establish clothing ownership
+  for a blanket material assignment. It remains an unregistered CC0 source asset with no accepted
+  body, portrait, or FighterDef.
+- Corrected Roger Tsien's fighter-owned wire-glasses depth after the temporary Curie host did not
+  predict his registered face fit. The sealed body remains unchanged; fresh real-route two-slot
+  captures and the refreshed portrait receipt bind the independently accepted local appearance
+  correction.
+- Clarified that authored-body repair always targets the canonical
+  `mesh2motion_male_5` joint order while a visual donor remains a separate
+  source decision. Recorded Anfinsen's one-proof `male_32` rejection for its
+  high bald crown and thin side hair; the CC0 source stays unregistered for
+  other lanes.
+- Retired Rita Levi-Montalcini's one-pass Curie-donor comparison after its
+  exact-byte two-slot capture and independent review. The model moved
+  coherently, but Curie's painted gray crown, angular pale side wedges, and
+  facial profile remained dominant, so it read as a Curie costume variation at
+  gameplay scale. The canonical Curie asset remains unchanged; Levi-Montalcini
+  now requires a different native face-and-hair donor rather than another
+  cosmetic pass.
+- Extended the rigid `AppearanceKit` glasses cue with a small rectangular-frame style and a
+  fighter-owned local fit offset from the canonical eye line. Existing wire frames retain their
+  geometry and material; both styles use the same head attachment and owned-resource lifecycle.
+- Corrected browser chooser fixtures to navigate the current eligible fighter set, confirm the
+  chosen player against any distinct eligible AI opponent, and check the pause control as part of
+  the keyboard help contract. Franklin-specific unlock and secrecy assertions remain explicit.
+- Simplified the Franklin browser fixtures around stable behavior: denied startup storage still
+  fails closed, a validated local unlock makes Franklin selectable, chooser focus includes its
+  current Nobel link, and controlled debug combat verifies Franklin's win and restart pair. The
+  fixtures no longer depend on a fixed roster position, an omitted tab stop, or an autonomous
+  match outcome.
+- Recorded two source-ownership findings from rejected roster work: material names and Principled
+  factors do not replace a linked texture source, and default-scene reachability determines whether
+  authored accessory nodes can appear at runtime. Bertozzi's rejected Hodgkin-donor evidence and
+  Cech's legacy v1 evidence remain preserved while their simple-donor preparations stay unaccepted.
+- Vendored byte-checked CC0 `police_female` and `male_32` Mesh2Motion sources for one bounded
+  Strickland and Anfinsen donor experiment. Both remain unregistered source assets outside the
+  generated runtime manifest; their workstreams preserve the native head, hair, and 66-joint rig
+  and require a first gameplay proof before any promotion decision.
+- Vendored byte-checked CC0 `male_6` as an unregistered David Baker source donor. UW's published
+  2008 primary portrait supports its compact dark curly hair and clean-shaven early-career cue;
+  the article date does not assert the photograph date or glasses. One bounded material-pass
+  comparison with the historically prepared, unrun `male_5` donor remains required. Neither asset
+  is a fighter body or generated-manifest entry, and visible native jaw stubble or a generic face
+  must reject the donor.
+- Fixed the source-quality gate so named capture callbacks receive browser globals, the capture
+  path regex error is reported at its source, and the tracked code remains formatter-clean. G1
+  passed 53/53 Node tests.
+- Corrected roster status documentation for the then-registered seven-fighter roster, Doudna's
+  accepted runtime promotion, and the current lightweight Hodgkin and Tsien experiments.
+- Clarified the active roster status: eight fighters are integrated, while the refreshed full
+  serial browser gate remains pending.
 - Rotated the changelog after it exceeded 800 lines, retaining the two newest
   day blocks here and preserving the older September entries in
   `CHANGELOG-2026-09a.md`.

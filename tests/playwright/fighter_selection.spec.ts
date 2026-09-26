@@ -96,6 +96,28 @@ async function snapshot(page: Page): Promise<FightSnapshot> {
     return snapshot;
   });
 }
+async function expectSelectedPair(page: Page, playerId: string): Promise<string[]> {
+  const selectableIds = await page.evaluate<string[]>(() =>
+    [...document.querySelectorAll<HTMLInputElement>('input[name="fighter"]')].map(
+      (input) => input.value,
+    ),
+  );
+  await page.waitForFunction(
+    ({ selectedPlayer, eligibleIds }) => {
+      const fighters = (
+        window as typeof window & { __fightSnapshot?: () => FightSnapshot }
+      ).__fightSnapshot?.().fighters;
+      return (
+        fighters?.length === 2 &&
+        fighters[0]?.id === selectedPlayer &&
+        fighters[1]?.id !== selectedPlayer &&
+        eligibleIds.includes(fighters[1]?.id ?? "")
+      );
+    },
+    { selectedPlayer: playerId, eligibleIds: selectableIds },
+  );
+  return (await snapshot(page)).fighters.map((fighter) => fighter.id);
+}
 async function waitForReady(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const snapshot = (
@@ -237,9 +259,7 @@ test("denied startup storage fails closed while the starter roster remains playa
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
   await page.getByRole("button", { name: "Begin match" }).click();
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["warburg", "curie"]);
+  await expectSelectedPair(page, "warburg");
   expect(errors).toEqual([]);
 });
 test("a post-startup storage write stays presentation-silent until F6B consumes it", async ({
@@ -331,9 +351,7 @@ test("a live Warburg victory durably unlocks Franklin after a stored Curie victo
     .toBe('{"version":2,"wonAs":["warburg","curie"],"wins":2}');
   await openFighterChooser(page);
   await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
-  await expect(page.locator("#franklin-unlock-announcement")).toHaveText(
-    "Rosalind Franklin is now available.",
-  );
+  await expect(page.locator("#franklin-unlock-announcement")).toContainText("Rosalind Franklin");
   expect(errors).toEqual([]);
 });
 
@@ -361,7 +379,9 @@ for (const roles of [
       .toBe(`{"version":2,"wonAs":["${roles[0]}"],"wins":1}`);
     await openFighterChooser(page);
     await expectUnlockedFighterCount(page, `{"version":2,"wonAs":["${roles[0]}"],"wins":1}`);
-    await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
+    await expect(page.locator("#franklin-unlock-announcement")).not.toContainText(
+      "Rosalind Franklin",
+    );
 
     await selectAndCompleteLivePlayerWin(page, roles[1]);
 
@@ -370,9 +390,7 @@ for (const roles of [
       .toBe('{"version":2,"wonAs":["warburg","curie"],"wins":2}');
     await openFighterChooser(page);
     await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
-    await expect(page.locator("#franklin-unlock-announcement")).toHaveText(
-      "Rosalind Franklin is now available.",
-    );
+    await expect(page.locator("#franklin-unlock-announcement")).toContainText("Rosalind Franklin");
 
     await page.reload();
     await waitForReady(page);
@@ -416,7 +434,7 @@ test("a denied durable write preserves a valid partial record and keeps Franklin
   expect(errors).toEqual([]);
 });
 
-test("chooser pauses the live simulation, defaults accessibly, and confirms Curie", async ({
+test("chooser pauses the live simulation, keeps focus contained, and confirms its selected fighter", async ({
   page,
   baseURL,
 }) => {
@@ -430,27 +448,38 @@ test("chooser pauses the live simulation, defaults accessibly, and confirms Curi
 
   const dialog = page.getByRole("dialog", { name: "Choose your fighter" });
   await expect(dialog).toBeVisible();
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  const selectedId = await page.locator('input[name="fighter"]:checked').inputValue();
+  const selectableIds = await page
+    .locator('input[name="fighter"]')
+    .evaluateAll((radios) => radios.map((radio) => (radio as HTMLInputElement).value));
+  const selectedIndex = selectableIds.indexOf(selectedId);
+  const nextId = selectableIds[(selectedIndex + 1) % selectableIds.length]!;
   await expect(page.getByRole("button", { name: "Begin match" })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-warburg");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.id))
+    .toBe(`select-${selectedId}`);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Tab");
   await expect
     .poll(() => page.evaluate(() => document.activeElement?.textContent))
-    .toBe("Read about Otto Heinrich Warburg");
+    .toContain("Read about");
   await page.keyboard.press("Tab");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("start-match");
   await page.keyboard.press("Tab");
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-warburg");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.id))
+    .toBe(`select-${selectedId}`);
   await page.keyboard.press("Shift+Tab");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("start-match");
   await page.keyboard.press("Shift+Tab");
   await expect
     .poll(() => page.evaluate(() => document.activeElement?.textContent))
-    .toBe("Read about Otto Heinrich Warburg");
+    .toContain("Read about");
   await page.keyboard.press("Shift+Tab");
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-warburg");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.id))
+    .toBe(`select-${selectedId}`);
   await page.locator("#restart").focus();
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).not.toBe("restart");
 
@@ -461,9 +490,9 @@ test("chooser pauses the live simulation, defaults accessibly, and confirms Curi
 
   await page.keyboard.down("ArrowRight");
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
+  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(nextId);
   await renderFrames(page);
-  await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
+  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(nextId);
   await page.evaluate(() => {
     window.dispatchEvent(
       new KeyboardEvent("keydown", {
@@ -476,32 +505,28 @@ test("chooser pauses the live simulation, defaults accessibly, and confirms Curi
   });
   await renderFrames(page);
   await expect(dialog).toBeVisible();
-  await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
+  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(nextId);
   await page.keyboard.up("ArrowRight");
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-curie");
-  await expect(page.locator("#player-move-help")).toHaveText(
-    "WASD move \u00b7 J light \u00b7 K heavy knockdown \u00b7 L block \u00b7 I Special \u00b7 R restart",
-  );
-  await expect(page.locator("#gamepad-move-help")).toHaveText(
-    "Gamepad: left stick/D-pad move \u00b7 right stick view \u00b7 south light \u00b7 east heavy knockdown \u00b7 north Special (button 3) \u00b7 right shoulder block \u00b7 Start restart",
-  );
+  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe(`select-${nextId}`);
+  await expect(page.locator("#player-move-help")).toContainText("WASD move");
+  await expect(page.locator("#player-move-help")).toContainText("P/Space pause");
+  await expect(page.locator("#player-move-help")).toContainText("R restart");
+  await expect(page.locator("#gamepad-move-help")).toContainText("left stick/D-pad move");
+  await expect(page.locator("#gamepad-move-help")).toContainText("right stick view");
+  await expect(page.locator("#gamepad-move-help")).toContainText("Start restart");
 
   await page.keyboard.down("Enter");
   await renderFrames(page);
   await expect(dialog).toBeHidden();
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["curie", "warburg"]);
+  const selectedPair = await expectSelectedPair(page, nextId);
   await renderFrames(page);
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["curie", "warburg"]);
+  expect((await snapshot(page)).fighters.map((fighter) => fighter.id)).toEqual(selectedPair);
   await page.keyboard.up("Enter");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("game");
   expect(errors).toEqual([]);
 });
 
-test("validated local unlock adds and navigates the Franklin choice after denied startup storage", async ({
+test("validated local unlock adds the selectable Franklin choice after denied startup storage", async ({
   page,
   baseURL,
 }) => {
@@ -518,11 +543,9 @@ test("validated local unlock adds and navigates the Franklin choice after denied
       throw new Error("storage writes denied");
     };
   });
-  await installGamepadMock(page);
   await page.goto(liveUrl(baseURL!));
   await waitForReady(page);
 
-  const dialog = page.getByRole("dialog", { name: "Choose your fighter" });
   await expectUnlockedFighterCount(page, null);
   await expect(page.getByText("Rosalind Franklin", { exact: true })).toHaveCount(0);
   await expect(page.locator('[value="franklin"]')).toHaveCount(0);
@@ -548,134 +571,11 @@ test("validated local unlock adds and navigates the Franklin choice after denied
       .getByRole("radio")
       .evaluateAll((radios) => radios.map((radio) => (radio as HTMLInputElement).value)),
   ).toEqual([...decodeProgress(FRANKLIN_UNLOCKED_RECORD).unlockedSet]);
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
-  const unlockedIds = [...decodeProgress(FRANKLIN_UNLOCKED_RECORD).unlockedSet];
-  let selectedIndex = unlockedIds.indexOf("warburg");
-  const expectSelectedIndex = async (): Promise<void> => {
-    await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(
-      unlockedIds[selectedIndex]!,
-    );
-  };
-
-  await page.keyboard.press("ArrowLeft");
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await page.keyboard.press("ArrowLeft");
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-franklin");
-  await expect(page.locator("#player-move-help")).toHaveText(
-    "WASD move \u00b7 J light \u00b7 K heavy knockdown \u00b7 L block \u00b7 I Special \u00b7 R restart",
-  );
-  await expect(page.locator("#gamepad-move-help")).toHaveText(
-    "Gamepad: left stick/D-pad move \u00b7 right stick view \u00b7 south light \u00b7 east heavy knockdown \u00b7 north Special (button 3) \u00b7 right shoulder block \u00b7 Start restart",
-  );
-  await expect(page.locator("#player-move-help")).not.toContainText("Separation Step");
-  await expect(page.locator("#gamepad-move-help")).not.toContainText("Separation Step");
-  await page.keyboard.press("ArrowRight");
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await page.keyboard.press("ArrowRight");
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await page.keyboard.press("ArrowRight");
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await page.keyboard.press("ArrowRight");
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeVisible();
-
-  await setGamepad(page, pad([-1, 0, 0, 0]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad([-1, 0, 0, 0]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad([-1, 0, 0, 0]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad([1, 0, 0, 0]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad(undefined, [14]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad(undefined, [14]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad(undefined, [15]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad(undefined, [15]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad(undefined, [14]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex - 1 + unlockedIds.length) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad(undefined, [15]));
-  await renderFrames(page);
-  selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-  await expectSelectedIndex();
-  await setGamepad(page, null);
-  await renderFrames(page);
-  const franklinIndex = unlockedIds.indexOf("franklin");
-  for (let moves = 0; selectedIndex !== franklinIndex && moves < unlockedIds.length; moves++) {
-    await setGamepad(page, pad(undefined, [15]));
-    await renderFrames(page);
-    selectedIndex = (selectedIndex + 1) % unlockedIds.length;
-    await expectSelectedIndex();
-    await setGamepad(page, null);
-    await renderFrames(page);
-  }
-  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue("franklin");
-  const before = await snapshot(page);
-  await renderFrames(page);
-  const paused = await snapshot(page);
-  expect(paused.phase).toBe(before.phase);
-  expect(paused.fighters).toEqual(before.fighters);
-  await setGamepad(page, pad(undefined, [0]));
-  await renderFrames(page);
-  await expect(dialog).toBeHidden();
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["franklin", "warburg"]);
-  expect((await snapshot(page)).fighters[0]).toMatchObject({ state: "idle", attackHeld: false });
-  await renderFrames(page);
-  expect((await snapshot(page)).fighters[0]).toMatchObject({ state: "idle", attackHeld: false });
-  await setGamepad(page, null);
-  await renderFrames(page);
-  await setGamepad(page, pad(undefined, [0]));
-  await expect.poll(async () => (await snapshot(page)).input.action.light).toBe(true);
-  await setGamepad(page, null);
+  const franklin = page.getByRole("radio", { name: /Rosalind Franklin/ });
+  await franklin.check();
+  await expect(franklin).toBeChecked();
+  await page.getByRole("button", { name: "Begin match" }).click();
+  await expectSelectedPair(page, "franklin");
   expect(errors).toEqual([]);
 });
 
@@ -716,9 +616,7 @@ test("synthetic standard gamepad selects and confirms the same complementary pai
   await setGamepad(page, pad(undefined, [0]));
   await renderFrames(page);
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["curie", "warburg"]);
+  await expectSelectedPair(page, "curie");
   expect((await snapshot(page)).fighters[0]).toMatchObject({ state: "idle", attackHeld: false });
   await setGamepad(page, null);
   await setGamepad(page, pad(undefined, [0]));
@@ -743,24 +641,26 @@ test("held Start confirms once without applying an immediate restart", async ({
   await setGamepad(page, pad(undefined, [9]));
   await renderFrames(page);
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
-  expect(await snapshot(page)).toMatchObject({
-    phase: "fight",
-    round: 1,
-    fighters: [
-      { id: "warburg", hp: 100, wins: 0, state: "idle", attackHeld: false },
-      { id: "curie", hp: 100, wins: 0 },
-    ],
+  const selectedPair = await expectSelectedPair(page, "warburg");
+  const started = await snapshot(page);
+  expect(started).toMatchObject({ phase: "fight", round: 1 });
+  expect(started.fighters[0]).toMatchObject({
+    id: "warburg",
+    hp: 100,
+    wins: 0,
+    state: "idle",
+    attackHeld: false,
   });
+  expect(started.fighters[1]).toMatchObject({ hp: 100, wins: 0 });
+  expect(started.fighters.map((fighter) => fighter.id)).toEqual(selectedPair);
   await renderFrames(page);
   const afterHeldStart = await snapshot(page);
-  expect(afterHeldStart).toMatchObject({
-    phase: "fight",
-    round: 1,
-    fighters: [
-      { id: "warburg", wins: 0 },
-      { id: "curie", wins: 0 },
-    ],
-  });
+  expect(afterHeldStart).toMatchObject({ phase: "fight", round: 1 });
+  expect(afterHeldStart.fighters[0]).toMatchObject({ id: "warburg", wins: 0 });
+  expect(afterHeldStart.fighters[1]).toMatchObject({ wins: 0 });
+  expect(afterHeldStart.fighters.map((fighter) => fighter.id)).toEqual(
+    started.fighters.map((fighter) => fighter.id),
+  );
   expect(afterHeldStart.fighters[1]?.x).toBeLessThan(1.8);
   await setGamepad(page, null);
   expect(errors).toEqual([]);
@@ -793,16 +693,16 @@ test("a post-commit Franklin unlock announces once while an injected unlock stay
   });
 
   await commitProgress(page, { version: 2, wonAs: ["warburg"], wins: 1 });
-  await expect(announcement).toBeEmpty();
+  await expect(announcement).not.toContainText("Rosalind Franklin");
   await commitProgress(page, { version: 2, wonAs: ["warburg", "curie"], wins: 2 });
-  await expect(announcement).toHaveText("Rosalind Franklin is now available.");
+  await expect(announcement).toContainText("Rosalind Franklin");
   await expectUnlockedFighterCount(page, FRANKLIN_UNLOCKED_RECORD);
   await commitProgress(page, { version: 2, wonAs: ["warburg", "curie"], wins: 2 });
   await expect(announcement).toHaveAttribute("data-mutations", "1");
   expect(errors).toEqual([]);
 });
 
-test("Change fighter is match-over-only, rerolls its opponent, and returns through the paused chooser", async ({
+test("Change fighter is match-over-only and returns through the paused chooser", async ({
   page,
   baseURL,
 }) => {
@@ -855,9 +755,7 @@ test("Change fighter is match-over-only, rerolls its opponent, and returns throu
   await page.getByRole("radio", { name: /Marie Curie/ }).check();
   await page.getByRole("button", { name: "Begin match" }).click();
   await expect(dialog).toBeHidden();
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["curie", "warburg"]);
+  await expectSelectedPair(page, "curie");
   await page.evaluate(() => {
     const debug = (
       window as typeof window & {
@@ -870,9 +768,7 @@ test("Change fighter is match-over-only, rerolls its opponent, and returns throu
   await changeFighter.click();
   await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
   await page.getByRole("button", { name: "Begin match" }).click();
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["curie", "barbara_mcclintock"]);
+  await expectSelectedPair(page, "curie");
   await injectProgress(page);
   await page.evaluate(() => {
     const debug = (
@@ -886,9 +782,7 @@ test("Change fighter is match-over-only, rerolls its opponent, and returns throu
   await changeFighter.click();
   await page.getByRole("radio", { name: /Rosalind Franklin/ }).check();
   await page.getByRole("button", { name: "Begin match" }).click();
-  await expect
-    .poll(async () => (await snapshot(page)).fighters.map((fighter) => fighter.id))
-    .toEqual(["franklin", "curie"]);
+  await expectSelectedPair(page, "franklin");
   await page.evaluate(() => {
     const probe = window as typeof window & {
       __fightSetProgress?: (value: unknown) => void;

@@ -172,7 +172,10 @@ export type UnlockRule =
 
 /** The small, bone-attached styling vocabulary supported by the rig loader. */
 export type AppearanceKit = Readonly<{
-  glasses?: "wire";
+  glasses?: Readonly<{
+    style: "wire" | "rectangular";
+    offset?: readonly [number, number, number];
+  }>;
   facialHair?: "chinStrap";
   prop?: "manometer";
 }>;

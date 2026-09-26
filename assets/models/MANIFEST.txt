@@ -1,7 +1,12 @@
 assets/models/mesh2motion_doctor_m.glb
 assets/models/mesh2motion_curie_period.glb
 assets/models/mesh2motion_female_9.glb
+assets/models/mesh2motion_levi_montalcini_1950s.glb
 assets/models/mesh2motion_buck_2002.glb
+assets/models/mesh2motion_bertozzi_2022.glb
+assets/models/mesh2motion_tsien_2008.glb
 assets/models/mesh2motion_doudna_2018.glb
 assets/models/mesh2motion_mcclintock.glb
+assets/models/mesh2motion_strickland_1985.glb
 assets/models/mesh2motion_goodenough_1964.glb
+assets/models/mesh2motion_hodgkin_1970.glb

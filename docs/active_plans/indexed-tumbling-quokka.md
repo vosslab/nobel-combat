@@ -823,7 +823,7 @@ supported rigid accessories meet the same visual gate; it is not a generic-body 
 
 | Wave | Fighters |
 | --- | --- |
-| 1 (M22-M23) | Hodgkin, Goodenough, Buck (McClintock integrated in M14 and currently reopened for visual replacement) |
+| 1 (M22-M23) | Hodgkin, Goodenough, Buck (McClintock's M14 visual work is complete) |
 | 2 (M24-M25) | Doudna, Tsien, Strickland, Levi-Montalcini, Bertozzi |
 | 3 (M26-M27) | Baker, Steitz, Frank, Anfinsen, Blackburn |
 | 4 (M28-M29) | Kariko, Altman, Cech, Baltimore |

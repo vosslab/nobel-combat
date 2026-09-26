@@ -44,6 +44,18 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function retainedReceipts(outputDirectory, fighterIds) {
+  const receiptPath = resolve(outputDirectory, "capture_receipt.json");
+  try {
+    const prior = JSON.parse(readFileSync(receiptPath, "utf8"));
+    if (!Array.isArray(prior.receipts)) return [];
+    return prior.receipts.filter((receipt) => !fighterIds.includes(receipt.fighterId));
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
 async function settle(page) {
   await page.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
@@ -53,6 +65,7 @@ async function settle(page) {
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   mkdirSync(options.outputDirectory, { recursive: true });
+  const priorReceipts = retainedReceipts(options.outputDirectory, options.fighters);
   const appUrl = new URL(options.url);
   appUrl.searchParams.set("debug", "1");
   const browser = await chromium.launch({ headless: true });
@@ -190,7 +203,7 @@ async function main() {
   }
   writeFileSync(
     resolve(options.outputDirectory, "capture_receipt.json"),
-    `${JSON.stringify({ url: options.url, receipts }, null, 2)}\n`,
+    `${JSON.stringify({ url: options.url, receipts: [...priorReceipts, ...receipts] }, null, 2)}\n`,
   );
 }
 

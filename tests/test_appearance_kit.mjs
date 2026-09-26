@@ -13,29 +13,33 @@ function skeletonWithBones(scene, names) {
   return skeleton;
 }
 
-test("head accessories follow the head bone", () => {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
-  const root = new TransformNode("accessory root", scene);
-  const skeleton = skeletonWithBones(scene, ["head"]);
-  const head = skeleton.bones[0].getTransformNode();
-  assert.ok(head instanceof TransformNode);
+test("head glasses styles follow the head bone and release their resources", () => {
+  for (const [label, glasses] of [
+    ["wire accessory kit", { style: "wire" }],
+    ["rectangular accessory kit", { style: "rectangular", offset: [0.01, -0.005, 0.02] }],
+  ]) {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const root = new TransformNode(`${label} root`, scene);
+    const skeleton = skeletonWithBones(scene, ["head"]);
+    const head = skeleton.bones[0].getTransformNode();
+    assert.ok(head instanceof TransformNode);
 
-  const runtime = applyAppearanceKit(root, [skeleton], scene, "accessory kit", {
-    glasses: "wire",
-    facialHair: "chinStrap",
-  });
-  assert.ok(runtime);
-  const accessories = scene.meshes.filter((mesh) => mesh.name.startsWith("accessory kit"));
-  assert.ok(accessories.length > 0, "accessories generate visible meshes");
-  assert.ok(
-    accessories.every((mesh) => mesh.parent === head),
-    "all head accessories must follow the head bone",
-  );
+    const runtime = applyAppearanceKit(root, [skeleton], scene, label, { glasses });
+    assert.ok(runtime);
+    const accessories = scene.meshes.filter((mesh) => mesh.name.startsWith(label));
+    assert.ok(accessories.length > 0, `${label} generates visible meshes`);
+    assert.ok(
+      accessories.every((mesh) => mesh.parent === head),
+      `${label} meshes follow the head bone`,
+    );
 
-  runtime.dispose();
-  scene.dispose();
-  engine.dispose();
+    runtime.dispose();
+    assert.equal(scene.meshes.filter((mesh) => mesh.name.startsWith(label)).length, 0);
+    assert.equal(scene.materials.filter((material) => material.name.startsWith(label)).length, 0);
+    scene.dispose();
+    engine.dispose();
+  }
 });
 
 test("manometer owns and releases its bone-attached visual resources", () => {
@@ -69,34 +73,23 @@ test("manometer owns and releases its bone-attached visual resources", () => {
   engine.dispose();
 });
 
-test("failed kit construction leaves no kit-owned nodes, meshes, or materials", () => {
-  const engine = new NullEngine();
-  const scene = new Scene(engine);
-  const root = new TransformNode("failure root", scene);
-  const skeleton = skeletonWithBones(scene, ["head", "pelvis"]);
-  assert.throws(
-    () =>
-      applyAppearanceKit(root, [skeleton], scene, "failed kit", {
-        glasses: "wire",
-        prop: "manometer",
-      }),
-    /lowerarm_l/,
-  );
-  assert.equal(
-    scene.meshes.filter((mesh) => mesh.name.startsWith("failed kit")).length,
-    0,
-    "failed construction must dispose kit meshes",
-  );
-  assert.equal(
-    scene.transformNodes.filter((node) => node.name.startsWith("failed kit")).length,
-    0,
-    "failed construction must dispose kit transform nodes",
-  );
-  assert.equal(
-    scene.materials.filter((material) => material.name.startsWith("failed kit")).length,
-    0,
-    "failed construction must dispose kit materials",
-  );
-  scene.dispose();
-  engine.dispose();
+test("failed glasses kit construction leaves no kit-owned nodes, meshes, or materials", () => {
+  for (const [label, glasses] of [
+    ["failed wire kit", { style: "wire" }],
+    ["failed rectangular kit", { style: "rectangular", offset: [0.01, -0.005, 0.02] }],
+  ]) {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const root = new TransformNode("failure root", scene);
+    const skeleton = skeletonWithBones(scene, ["head", "pelvis"]);
+    assert.throws(
+      () => applyAppearanceKit(root, [skeleton], scene, label, { glasses, prop: "manometer" }),
+      /lowerarm_l/,
+    );
+    assert.equal(scene.meshes.filter((mesh) => mesh.name.startsWith(label)).length, 0);
+    assert.equal(scene.transformNodes.filter((node) => node.name.startsWith(label)).length, 0);
+    assert.equal(scene.materials.filter((material) => material.name.startsWith(label)).length, 0);
+    scene.dispose();
+    engine.dispose();
+  }
 });

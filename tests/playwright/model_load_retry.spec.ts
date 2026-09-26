@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { fighterById } from "../../src/roster/roster";
 
 type ModelSnapshot = {
   fighterId: string;
@@ -8,7 +9,7 @@ type ModelSnapshot = {
 test("a failed fighter load can be retried for the selected pair", async ({ page, baseURL }) => {
   let allowOriginalModel = false;
   let abortedInitialLoad = false;
-  await page.route(/mesh2motion_female_31\.glb$/, async (route) => {
+  await page.route(new URL(fighterById("warburg").body, baseURL).toString(), async (route) => {
     if (!allowOriginalModel) {
       abortedInitialLoad = true;
       await route.abort("failed");

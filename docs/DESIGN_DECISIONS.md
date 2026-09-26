@@ -494,6 +494,36 @@ appearance gate reopens.
 **Owner.** `src/roster/fighter_def.ts`, `src/rig/appearance_kit.ts`, and
 `tests/test_appearance_kit.mjs`.
 
+### Glasses styles retain their fighter-owned rigid fit
+
+**Decision.** Represent glasses as a fixed rigid-kit style with an optional readonly local offset.
+The supported styles are wire and rectangular. Measure an offset from the canonical head eye line
+and keep it on the fighter appearance that needs it.
+
+**Why.** Wire circles do not communicate every fighter's prominent dark rectangular frames. A small
+local adjustment fits native heads without a body-fit registry, generic solver, or new asset path.
+
+**Consequence.** The rig loader owns the two fixed frame geometries and rejects any other style.
+Face and hair continue to carry identity; this contract adds only the rigid glasses cue.
+
+**Owner.** `src/roster/fighter_def.ts`, `src/rig/appearance_kit.ts`, and
+`tests/appearance_kit_type_contract.ts`.
+
+### Rectangular glasses encode each rim edge in its intended local axis
+
+**Decision.** Derive the two rectangular lens centers, their horizontal and vertical rim positions,
+and bridge width from shared lens dimensions and a positive nose gap.
+
+**Why.** The first axis correction made closed rims, but independently selected edge centers still
+put both inner vertical rims at the face center. The resulting bars covered the nose even though a
+fighter-specific depth offset could only move the whole frame.
+
+**Consequence.** The existing rectangular style produces two closed rims and a bridge across a
+deliberate nose gap while retaining its fighter-owned fit offset, head attachment, material, and
+lifecycle. Frame proportions remain implementation geometry, not fighter metadata.
+
+**Owner.** `src/rig/appearance_kit.ts`.
+
 ### Preserve qualifying donor mesh detail through rig adaptation
 
 **Decision.** Choose candidate sources by their rendered gameplay-scale quality. When a compatible
@@ -610,6 +640,20 @@ temporary or unrelated unlock changes may bypass a missing direct prerequisite.
 
 **Owner.** `docs/active_plans/indexed-tumbling-quokka.md`,
 `docs/active_plans/active/roster_expansion.md`, and the roster integrator.
+
+### Vertical chooser movement preserves a visible card column
+
+**Decision.** Select the nearest card above or below whose horizontal extent overlaps the selected
+card. When no such card exists, use the nearest vertical card as a fallback.
+
+**Why.** Category rows may contain locked cards that leave their available choices sparse. Pure
+nearest-row navigation can drift into another visible column, so reversing a vertical move does not
+return to the fighter the player started from.
+
+**Consequence.** The chooser derives columns from rendered card geometry; it stores no selection
+history and does not encode a fixed grid width. Keyboard and gamepad share this behavior.
+
+**Owner.** `src/ui/chooser.ts` and `tests/playwright/chooser_grid.spec.ts`.
 
 ### Chooser portraits show the fighter's actual face and hair
 

@@ -74,20 +74,28 @@ effect.
 
 - [ ] Export the skinned body with the authoring tool's native armature and skin exporter. Do not
       hand-write skeletal binding arrays or coordinate-space data.
-- [ ] Repair the export against its matching native donor before preflight and capture. See
+- [ ] Repair the export against the canonical joint-order reference before preflight and capture.
+      The appearance donor remains a separate source choice. See
       [assets/README.md](../assets/README.md#authored-body-rig-repair).
 
   ```sh
   node devel/repair_skin_joint_order.mjs \
-    <matching-native-donor.glb> <authored-export.glb> <repaired-candidate.glb>
+    assets/models/mesh2motion_male_5.glb <authored-export.glb> <repaired-candidate.glb>
   ```
 
   Use `<repaired-candidate.glb>` for every later preflight and capture. The repair remaps
-  `JOINTS_0` values and inverse-bind rows to the donor joint-name order. It does not prove skin
-  weights, bind-pose deformation, or appearance; the final 16 captures and independent visual
-  review remain the evidence for sampled deformation and appearance.
+  `JOINTS_0` values and inverse-bind rows to `mesh2motion_male_5`'s canonical joint-name order.
+  It does not prove skin weights, bind-pose deformation, or appearance; the final 16 captures and
+  independent visual review remain the evidence for sampled deformation and appearance.
 
 ## 4. Run static checks
+
+- [ ] Check an authoring script's syntax in memory. `py_compile` and `compileall` intentionally
+      write bytecode, so use this command instead:
+
+  ```sh
+  source source_me.sh && python3 -B -c 'import pathlib, sys; path = pathlib.Path(sys.argv[1]); compile(path.read_text(), str(path), "exec")' <author-script.py>
+  ```
 
 - [ ] Run the rig and scene preflight before launching Chromium:
 
@@ -155,12 +163,16 @@ effect.
   Review `opponent/face-scene.png` alongside `opponent/face-front.png`,
   `opponent/face-orbit-left.png`, and `opponent/face-orbit-right.png` before spending an
   appearance pass on clothing. The full paused frame shows when a crop misses or clips the head.
+
 - [ ] Keep the donor's human facial detail. Make only source-supported changes to the face and hair,
       and remove donor features that contradict the reference instead of covering them with extra
       geometry.
 - [ ] A head bone or a polygon's height cannot distinguish hair from face. Preserve the combined
       textured donor head by default; recolor hair only through separately owned hair geometry or
       material. Assign clothing only to polygons with no nonzero `head` or `head_leaf` influence.
+- [ ] Before capture, inspect a donor material's linked source as well as its displayed name. A
+      Principled Base Color factor does not override a connected RGBA texture; verify the repaired
+      export's intended material factor or visible ownership before treating an edit as present.
 - [ ] Separate broken presentation from a real gameplay-scale mismatch. Fix a UV, material, crop,
       or accidental facial-hair cue once before judging the source. Do not reject a usable donor
       solely because it cannot support portrait-level face reconstruction.
@@ -201,6 +213,9 @@ effect.
       body's intercepted URL and therefore applies that FighterDef's height and appearance kit. It
       does not select the candidate's skeleton, rig-repair donor, or clips. Choose the host closest
       to the intended fighter's height and kit setup; record any difference in the handoff.
+- [ ] A temporary-host accessory fit is provisional. Before integration acceptance, review the
+      actual registered fighter with its own body and `FighterDef.appearance`; correct only the
+      fighter-owned fit if the same accessory misses that face.
 - [ ] Use each receipt's `bodyOwner`, `playerId`, and `opponentId` to locate the candidate. In the
       player capture it replaces `playerId`; in the opponent capture it replaces `opponentId`. The
       rig donor remains the asset named in the authoring and repair record.

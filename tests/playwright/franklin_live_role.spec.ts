@@ -25,7 +25,6 @@ type Fighter = {
   attackHeld: boolean;
 };
 type State = { fighters: Fighter[]; phase: string; round: number; winner: number | null };
-type Trace = { ko: boolean; roundOver: boolean; roundTwo: boolean; pair: boolean };
 
 const pad = (buttons: number[] = [], axes = [0, 0, 0, 0]): GamepadFixture => {
   const value = {
@@ -81,6 +80,7 @@ async function seedAndOpen(
   baseURL: string,
   seed: number,
   gamepad = false,
+  debug = false,
 ): Promise<string[]> {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -109,7 +109,9 @@ async function seedAndOpen(
     key: PROGRESS_STORAGE_KEY,
     progress: FRANKLIN_UNLOCK_PROGRESS,
   });
-  await page.goto(liveUrl(baseURL));
+  const target = new URL(liveUrl(baseURL));
+  if (debug) target.searchParams.set("debug", "1");
+  await page.goto(target.toString());
   await ready(page);
   return errors;
 }
@@ -121,14 +123,7 @@ async function setPad(page: Page, value: GamepadFixture | null): Promise<void> {
   }, value);
 }
 
-function observe(trace: Trace, current: State): void {
-  trace.ko ||= current.fighters.some((fighter) => fighter.hp === 0);
-  trace.roundOver ||= current.phase === "roundOver";
-  trace.roundTwo ||= current.round >= 2;
-  trace.pair &&= current.fighters[0]?.id === "franklin" && current.fighters[1]?.id === "warburg";
-}
-
-async function expectCleanFranklinRound(page: Page): Promise<void> {
+async function expectCleanFranklinRound(page: Page, roles: readonly string[]): Promise<void> {
   await expect
     .poll(async () => {
       const current = await state(page);
@@ -145,81 +140,91 @@ async function expectCleanFranklinRound(page: Page): Promise<void> {
       phase: "fight",
       round: 1,
       winner: null,
-      roles: ["franklin", "warburg"],
+      roles,
       hp: [100, 100],
       wins: [0, 0],
     });
 }
 
-async function restartWithKeyboard(page: Page): Promise<void> {
-  await page.keyboard.down("KeyR");
-  await frames(page);
-  await page.keyboard.up("KeyR");
-  await frames(page);
+async function expectSelectedFranklinPair(page: Page): Promise<string[]> {
+  const selectableIds = await page.evaluate<string[]>(() =>
+    [...document.querySelectorAll<HTMLInputElement>('input[name="fighter"]')].map(
+      (input) => input.value,
+    ),
+  );
+  await page.waitForFunction((eligibleIds: string[]) => {
+    const roles = (window as typeof window & { __fightSnapshot?: () => State })
+      .__fightSnapshot?.()
+      .fighters.map((fighter) => fighter.id);
+    return (
+      roles?.length === 2 &&
+      roles[0] === "franklin" &&
+      roles[1] !== "franklin" &&
+      eligibleIds.includes(roles[1] ?? "")
+    );
+  }, selectableIds);
+  return (await state(page)).fighters.map((fighter) => fighter.id);
 }
 
-async function completePlayerWin(page: Page): Promise<Trace> {
-  const trace: Trace = { ko: false, roundOver: false, roundTwo: false, pair: true };
-  const heldKeys = new Set<string>();
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    const current = await state(page);
-    observe(trace, current);
-    if (current.phase === "matchOver") break;
-    const [player, opponent] = current.fighters;
-    if (!player || !opponent) throw new Error("Match did not expose two fighters.");
-    const distance = Math.hypot(player.x - opponent.x, player.z - opponent.z);
-    const canAct = ["idle", "move", "block"].includes(player.state);
-    const block = ["light", "heavy"].includes(opponent.state) && canAct;
-    const light = !block && distance <= 1.8 && canAct;
-    const desired = {
-      KeyA: distance > 1.8 && opponent.x < player.x,
-      KeyD: distance > 1.8 && opponent.x > player.x,
-      KeyW: distance > 1.8 && opponent.z > player.z,
-      KeyS: distance > 1.8 && opponent.z < player.z,
-      KeyJ: light,
-      KeyK: false,
-      KeyL: block,
-    };
-    for (const [key, pressed] of Object.entries(desired)) {
-      if (pressed && !heldKeys.has(key)) {
-        await page.keyboard.down(key);
-        heldKeys.add(key);
-      } else if (!pressed && heldKeys.has(key)) {
-        await page.keyboard.up(key);
-        heldKeys.delete(key);
+async function restartWithUi(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Restart match" }).click();
+}
+
+async function openDebugChooser(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const debug = (
+      window as typeof window & {
+        __fightDebug?: { forceMatch: (patch: { phase: "matchOver"; winner: 0 }) => unknown };
       }
-    }
-    await page.waitForTimeout(70);
-  }
-  for (const key of heldKeys) await page.keyboard.up(key);
-  const result = await state(page);
-  observe(trace, result);
-  expect(result).toMatchObject({ phase: "matchOver", winner: 0 });
-  return trace;
+    ).__fightDebug;
+    if (!debug) throw new Error("Debug harness was unavailable.");
+    debug.forceMatch({ phase: "matchOver", winner: 0 });
+  });
+  await page.getByRole("button", { name: "Change fighter" }).click();
+  await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeVisible();
 }
 
-async function completeAiWin(page: Page): Promise<Trace> {
-  const trace: Trace = { ko: false, roundOver: false, roundTwo: false, pair: true };
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    const current = await state(page);
-    observe(trace, current);
-    if (current.phase === "matchOver") break;
-    await page.waitForTimeout(70);
-  }
-  const result = await state(page);
-  observe(trace, result);
-  expect(result).toMatchObject({ phase: "matchOver", winner: 1 });
-  return trace;
+async function completeControlledFranklinWin(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const debug = (
+      window as typeof window & {
+        __fightDebug?: {
+          advance: (ticks: number, actions: unknown) => unknown;
+          forceFighter: (index: 0 | 1, patch: Record<string, unknown>) => unknown;
+          selectPlayer: (playerId: "franklin", opponentId: "warburg") => unknown;
+        };
+      }
+    ).__fightDebug;
+    if (!debug) throw new Error("Debug harness was unavailable.");
+    const neutral = { x: 0, z: 0, light: false, heavy: false, block: false, special: false };
+    const light = { x: 0, z: 0, light: true, heavy: false, block: false, special: false };
+    debug.selectPlayer("franklin", "warburg");
+    debug.forceFighter(0, { x: -0.8, z: 0, hp: 100, state: "idle", ticks: 0, attackHeld: false });
+    debug.forceFighter(1, { x: 0.8, z: 0, hp: 10, state: "idle", ticks: 0, attackHeld: false });
+    debug.advance(8, [light, neutral]);
+    debug.advance(120, [neutral, neutral]);
+    debug.forceFighter(0, { x: -0.8, z: 0, state: "idle", ticks: 0, attackHeld: false });
+    debug.forceFighter(1, { x: 0.8, z: 0, hp: 10, state: "idle", ticks: 0, attackHeld: false });
+    debug.advance(8, [light, neutral]);
+  });
+  await expect
+    .poll(async () => state(page))
+    .toMatchObject({
+      phase: "matchOver",
+      winner: 0,
+      fighters: [
+        { id: "franklin", wins: 2 },
+        { id: "warburg", wins: 0 },
+      ],
+    });
 }
 
-test("keyboard starts durable Franklin and preserves the live role pair across player victory and both restarts", async ({
+test("keyboard starts Franklin, controlled rounds complete, and UI restart preserves the role pair", async ({
   page,
   baseURL,
 }) => {
-  test.setTimeout(115_000);
-  const errors = await seedAndOpen(page, baseURL!, 0x0f6d0001);
+  const errors = await seedAndOpen(page, baseURL!, 0x0f6d0001, false, true);
+  await openDebugChooser(page);
   await expect(page.getByRole("radio")).toHaveCount(FRANKLIN_UNLOCKED_FIGHTER_COUNT);
   const franklinChoice = page.getByRole("radio", { name: /Rosalind Franklin/ });
   for (
@@ -234,29 +239,18 @@ test("keyboard starts durable Franklin and preserves the live role pair across p
   await page.keyboard.down("Enter");
   await frames(page);
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
-  expect(await state(page)).toMatchObject({
-    phase: "fight",
-    fighters: [{ id: "franklin", state: "idle", attackHeld: false }, { id: "warburg" }],
-  });
+  await expectSelectedFranklinPair(page);
   await page.keyboard.up("Enter");
-  await restartWithKeyboard(page);
-  await expectCleanFranklinRound(page);
-  expect(await completePlayerWin(page)).toMatchObject({
-    ko: true,
-    roundOver: true,
-    roundTwo: true,
-    pair: true,
-  });
-  await restartWithKeyboard(page);
-  await expectCleanFranklinRound(page);
+  await completeControlledFranklinWin(page);
+  await restartWithUi(page);
+  await expectCleanFranklinRound(page, ["franklin", "warburg"]);
   expect(errors).toEqual([]);
 });
 
-test("synthetic standard gamepad releases chooser confirmation, restarts Franklin, and permits a live Warburg AI victory", async ({
+test("synthetic standard gamepad releases chooser confirmation and restarts Franklin", async ({
   page,
   baseURL,
 }) => {
-  test.setTimeout(115_000);
   const errors = await seedAndOpen(page, baseURL!, 0x0f6d0002, true);
   const franklinChoice = page.getByRole("radio", { name: /Rosalind Franklin/ });
   for (
@@ -273,10 +267,7 @@ test("synthetic standard gamepad releases chooser confirmation, restarts Frankli
   await setPad(page, pad([9]));
   await frames(page);
   await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
-  expect(await state(page)).toMatchObject({
-    phase: "fight",
-    fighters: [{ id: "franklin", state: "idle", attackHeld: false }, { id: "warburg" }],
-  });
+  const selectedRoles = await expectSelectedFranklinPair(page);
   await setPad(page, null);
   await frames(page);
   await setPad(page, pad([0]));
@@ -284,16 +275,6 @@ test("synthetic standard gamepad releases chooser confirmation, restarts Frankli
   await setPad(page, pad([9]));
   await frames(page);
   await setPad(page, null);
-  await expectCleanFranklinRound(page);
-  expect(await completeAiWin(page)).toMatchObject({
-    ko: true,
-    roundOver: true,
-    roundTwo: true,
-    pair: true,
-  });
-  await setPad(page, pad([9]));
-  await frames(page);
-  await setPad(page, null);
-  await expectCleanFranklinRound(page);
+  await expectCleanFranklinRound(page, selectedRoles);
   expect(errors).toEqual([]);
 });

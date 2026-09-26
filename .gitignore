@@ -25,4 +25,3 @@ _temp*.?*
 
 /dist/
 /test-results/
-/devel/__pycache__/

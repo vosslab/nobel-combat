@@ -94,6 +94,7 @@ function addWireGlasses(
   head: TransformNode,
   scene: Scene,
   label: string,
+  eyeLine: Vector3,
 ): void {
   // These dimensions are deliberately expressed in the body model's local units.
   // The original double scaling made the frames effectively pin-sized at the game camera.
@@ -111,7 +112,7 @@ function addWireGlasses(
         scene,
       ),
       head,
-      new Vector3(x, 0.005, 0.04),
+      eyeLine.add(new Vector3(x, 0, 0)),
       wire,
     );
     frame.scaling.set(1, 0.78, 1);
@@ -125,8 +126,64 @@ function addWireGlasses(
       scene,
     ),
     head,
-    new Vector3(0, 0.005, 0.04),
+    eyeLine,
     wire,
+  );
+}
+
+function addRectangularGlasses(
+  resources: KitResources,
+  head: TransformNode,
+  scene: Scene,
+  label: string,
+  eyeLine: Vector3,
+): void {
+  const frame = material(resources, scene, `${label} rectangular glasses`, [0.045, 0.04, 0.035]);
+  frame.emissiveColor = new Color3(0.008, 0.006, 0.004);
+  // Keep the lens geometry derived from one set of dimensions.  The previous
+  // independently positioned inner rims met at x=0, so the frame covered the
+  // nose rather than leaving a bridge gap.
+  const lensHalfWidth = 0.031;
+  const lensHalfHeight = 0.023;
+  const rimThickness = 0.006;
+  const halfNoseGap = 0.01;
+  const lensCenter = lensHalfWidth + halfNoseGap;
+  const verticalRimOffset = lensHalfWidth - rimThickness / 2;
+  const bridgeWidth = 2 * (halfNoseGap + rimThickness / 2);
+  for (const [side, direction] of [
+    ["left", -1],
+    ["right", 1],
+  ] as const) {
+    const x = direction * lensCenter;
+    for (const [edge, edgeX, edgeY, width, height] of [
+      ["top", 0, lensHalfHeight, lensHalfWidth * 2, rimThickness],
+      ["bottom", 0, -lensHalfHeight, lensHalfWidth * 2, rimThickness],
+      ["outer", direction * verticalRimOffset, 0, rimThickness, lensHalfHeight * 2],
+      ["inner", -direction * verticalRimOffset, 0, rimThickness, lensHalfHeight * 2],
+    ] as const) {
+      attach(
+        resources,
+        MeshBuilder.CreateBox(
+          `${label} ${side} rectangular glass ${edge}`,
+          { width, height, depth: 0.012 },
+          scene,
+        ),
+        head,
+        eyeLine.add(new Vector3(x + edgeX, edgeY, 0)),
+        frame,
+      );
+    }
+  }
+  attach(
+    resources,
+    MeshBuilder.CreateBox(
+      `${label} rectangular bridge`,
+      { width: bridgeWidth, height: rimThickness, depth: 0.012 },
+      scene,
+    ),
+    head,
+    eyeLine,
+    frame,
   );
 }
 
@@ -337,7 +394,25 @@ export function applyAppearanceKit(
   try {
     if (kit.glasses || kit.facialHair) {
       const head = requiredBone(skeletons, ["head"], `${label} appearance kit`);
-      if (kit.glasses === "wire") addWireGlasses(resources, head, scene, label);
+      if (kit.glasses) {
+        // Native Mesh2Motion heads face toward positive local Z. Their head joints
+        // sit below the eyes, so this aligns the bridge with the native eye line.
+        const canonicalEyeLine = new Vector3(0, 0.14, 0.1);
+        const eyeLine = kit.glasses.offset
+          ? canonicalEyeLine.add(new Vector3(...kit.glasses.offset))
+          : canonicalEyeLine;
+        const style: string = kit.glasses.style;
+        switch (style) {
+          case "wire":
+            addWireGlasses(resources, head, scene, label, eyeLine);
+            break;
+          case "rectangular":
+            addRectangularGlasses(resources, head, scene, label, eyeLine);
+            break;
+          default:
+            throw new Error(`${label} appearance kit does not support glasses style '${style}'.`);
+        }
+      }
       if (kit.facialHair === "chinStrap") addChinStrap(resources, head, scene, label);
     }
     return {

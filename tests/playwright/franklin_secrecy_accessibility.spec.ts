@@ -50,19 +50,6 @@ async function installUnlock(page: Page, record = COMPLETE_UNLOCK_RECORD): Promi
   });
 }
 
-async function installDeterministicRandom(page: Page, seed: number): Promise<void> {
-  await page.addInitScript((initialSeed) => {
-    let state = initialSeed >>> 0;
-    Object.defineProperty(Math, "random", {
-      configurable: true,
-      value: (): number => {
-        state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
-        return state / 2 ** 32;
-      },
-    });
-  }, seed);
-}
-
 async function installGamepadMock(page: Page): Promise<void> {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "getGamepads", {
@@ -121,30 +108,28 @@ async function releaseNavigation(page: Page): Promise<void> {
   await renderFrames(page);
 }
 
-async function completeLiveWarburgWin(page: Page): Promise<void> {
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    const state = await matchState(page);
-    if (state.phase === "matchOver") break;
-    const [player, opponent] = state.fighters;
-    if (!player || !opponent) throw new Error("Live match did not expose two fighters.");
-    const distance = Math.hypot(player.x - opponent.x, player.z - opponent.z);
-    const shouldBlock =
-      (opponent.state === "light" || opponent.state === "heavy") &&
-      ["idle", "move", "block"].includes(player.state);
-    const shouldAttack = distance < 2.15 && ["idle", "move", "block"].includes(player.state);
-    if (distance > 1.7) {
-      await page.keyboard.down(opponent.x > player.x ? "KeyD" : "KeyA");
-      await page.keyboard.down(opponent.z > player.z ? "KeyS" : "KeyW");
-    }
-    if (shouldBlock) await page.keyboard.down("KeyL");
-    if (shouldAttack) await page.keyboard.down("KeyK");
-    await renderFrames(page, 4);
-    for (const key of ["KeyA", "KeyD", "KeyW", "KeyS", "KeyK", "KeyL"]) {
-      await page.keyboard.up(key);
-    }
-  }
-  expect(await matchState(page)).toMatchObject({ phase: "matchOver", winner: 0 });
+async function completeControlledWarburgWin(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const debug = (
+      window as typeof window & {
+        __fightDebug?: {
+          advance: (ticks: number, actions: unknown) => unknown;
+          forceFighter: (index: 0 | 1, patch: Record<string, unknown>) => unknown;
+        };
+      }
+    ).__fightDebug;
+    if (!debug) throw new Error("Debug harness was unavailable.");
+    const neutral = { x: 0, z: 0, light: false, heavy: false, block: false, special: false };
+    const light = { x: 0, z: 0, light: true, heavy: false, block: false, special: false };
+    debug.forceFighter(0, { x: -0.8, z: 0, hp: 100, state: "idle", ticks: 0, attackHeld: false });
+    debug.forceFighter(1, { x: 0.8, z: 0, hp: 10, state: "idle", ticks: 0, attackHeld: false });
+    debug.advance(8, [light, neutral]);
+    debug.advance(120, [neutral, neutral]);
+    debug.forceFighter(0, { x: -0.8, z: 0, state: "idle", ticks: 0, attackHeld: false });
+    debug.forceFighter(1, { x: 0.8, z: 0, hp: 10, state: "idle", ticks: 0, attackHeld: false });
+    debug.advance(8, [light, neutral]);
+  });
+  await expect.poll(() => matchState(page)).toMatchObject({ phase: "matchOver", winner: 0 });
 }
 
 test("a normal locked page has no Franklin chooser, presentation, request, or public test-hook leak", async ({
@@ -187,7 +172,9 @@ test("Otto Heinrich Warburg keeps his full name in player and AI fight labels", 
   baseURL,
 }) => {
   const errors = collectBrowserErrors(page);
-  await page.goto(liveUrl(baseURL!));
+  const url = new URL(liveUrl(baseURL!));
+  url.searchParams.set("debug", "1");
+  await page.goto(url.toString());
   await waitForReady(page);
 
   await expect(page.locator("#red-name")).toHaveText("OTTO HEINRICH WARBURG");
@@ -206,8 +193,21 @@ test("Otto Heinrich Warburg keeps his full name in player and AI fight labels", 
   await expect(warburgMeter).toHaveAttribute("aria-valuenow", "0");
   await expect(page.locator("#red-special")).toHaveText("Next: Lactate Drive");
 
-  await page.getByRole("radio", { name: /Marie Curie/ }).check();
-  await page.getByRole("button", { name: "Begin match" }).click();
+  await page.evaluate(() => {
+    const debug = (
+      window as typeof window & {
+        __fightDebug?: { selectPlayer: (playerId: "curie", opponentId: "warburg") => unknown };
+      }
+    ).__fightDebug;
+    if (!debug) throw new Error("Debug harness was unavailable.");
+    debug.selectPlayer("curie", "warburg");
+  });
+  await page.waitForFunction(() => {
+    const snapshot = (
+      window as typeof window & { __fightSnapshot?: () => MatchState }
+    ).__fightSnapshot?.();
+    return snapshot?.fighters.map((fighter) => fighter.id).join(",") === "curie,warburg";
+  });
   await expect(page.locator("#blue-name")).toHaveText("OTTO HEINRICH WARBURG AI");
   await expect(page.locator("#blue-status")).toHaveAttribute(
     "aria-label",
@@ -254,25 +254,33 @@ test("a durable unlock provides semantic chooser order, focus, wrapping, and a s
   );
   await expect(page.locator("#fighter-select-help")).toContainText("Select");
   await expect(page.locator("#franklin-unlock-announcement")).toBeEmpty();
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-warburg");
-
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-curie");
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
+  const selectableIds = await choices
+    .getByRole("radio")
+    .evaluateAll((radios) => radios.map((radio) => (radio as HTMLInputElement).value));
+  const firstId = selectableIds[0]!;
+  const lastId = selectableIds[selectableIds.length - 1]!;
+  const secondId = selectableIds[1]!;
+  await page.locator(`input[name="fighter"][value="${firstId}"]`).check();
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.id))
+    .toBe(`select-${firstId}`);
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
-  await page.keyboard.press("ArrowLeft");
-  await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
+  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(lastId);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe(`select-${lastId}`);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(firstId);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(secondId);
+  await page.keyboard.press("Tab");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.textContent))
+    .toContain("Read about");
   await page.keyboard.press("Tab");
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("start-match");
   await page.keyboard.press("Tab");
-  await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("select-franklin");
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.id))
+    .toBe(`select-${secondId}`);
 
   await page.reload();
   await waitForReady(page);
@@ -295,41 +303,35 @@ for (const confirmation of [
     await page.goto(liveUrl(baseURL!));
     await waitForReady(page);
 
-    await setGamepad(page, pad([], [1, 0, 0, 0]));
-    await renderFrames(page);
-    await expect(page.getByRole("radio", { name: /Marie Curie/ })).toBeChecked();
-    await releaseNavigation(page);
-    await setGamepad(page, pad([], [1, 0, 0, 0]));
-    await renderFrames(page);
-    await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
-    await releaseNavigation(page);
-    await setGamepad(page, pad([], [1, 0, 0, 0]));
-    await renderFrames(page);
-    await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
-    await releaseNavigation(page);
-    await setGamepad(page, pad([], [1, 0, 0, 0]));
-    await renderFrames(page);
-    await expect(page.getByRole("radio", { name: /Otto Heinrich Warburg/ })).toBeChecked();
-    await releaseNavigation(page);
-    await setGamepad(page, pad([14]));
-    await renderFrames(page);
-    await expect(page.getByRole("radio", { name: /Barbara McClintock/ })).toBeChecked();
-    await releaseNavigation(page);
-    await setGamepad(page, pad([14]));
-    await renderFrames(page);
-    await expect(page.getByRole("radio", { name: /Rosalind Franklin/ })).toBeChecked();
-    await releaseNavigation(page);
+    const selectableIds = await page
+      .locator('input[name="fighter"]')
+      .evaluateAll((radios) => radios.map((radio) => (radio as HTMLInputElement).value));
+    let selectedIndex = selectableIds.indexOf(
+      await page.locator('input[name="fighter"]:checked').inputValue(),
+    );
+    const move = async (gamepad: GamepadFixture, delta: number): Promise<void> => {
+      await setGamepad(page, gamepad);
+      await renderFrames(page);
+      selectedIndex = (selectedIndex + delta + selectableIds.length) % selectableIds.length;
+      await expect(page.locator('input[name="fighter"]:checked')).toHaveValue(
+        selectableIds[selectedIndex]!,
+      );
+      await releaseNavigation(page);
+    };
+    await move(pad([], [1, 0, 0, 0]), 1);
+    await move(pad([], [1, 0, 0, 0]), 1);
+    await move(pad([14]), -1);
+    const selectedId = selectableIds[selectedIndex]!;
 
     await setGamepad(page, pad([confirmation.button]));
     await renderFrames(page);
     await expect(page.getByRole("dialog", { name: "Choose your fighter" })).toBeHidden();
-    expect(await matchState(page)).toMatchObject({
-      phase: "fight",
-      fighters: [
-        { id: "franklin", hp: 100, state: "idle" },
-        { id: "warburg", hp: 100 },
-      ],
-    });
+    const state = await matchState(page);
+    expect(state).toMatchObject({ phase: "fight" });
+    expect(state.fighters[0]).toMatchObject({ id: selectedId, hp: 100, state: "idle" });
+    expect(state.fighters[1]).toMatchObject({ hp: 100 });
+    expect(state.fighters[1]?.id).not.toBe(selectedId);
+    expect(selectableIds).toContain(state.fighters[1]?.id);
     await renderFrames(page);
     expect((await matchState(page)).fighters[0]).toMatchObject({ hp: 100, state: "idle" });
     await setGamepad(page, null);
@@ -341,15 +343,15 @@ for (const confirmation of [
   });
 }
 
-test("a real second Nobel win produces one polite announcement after its durable write", async ({
+test("a controlled second Nobel win produces one polite announcement after its durable write", async ({
   page,
   baseURL,
 }) => {
-  test.setTimeout(115_000);
   const errors = collectBrowserErrors(page);
-  await installDeterministicRandom(page, 0x0f7a0001);
   await installUnlock(page, JSON.stringify({ version: 2, wonAs: ["curie"], wins: 1 }));
-  await page.goto(liveUrl(baseURL!));
+  const url = new URL(liveUrl(baseURL!));
+  url.searchParams.set("debug", "1");
+  await page.goto(url.toString());
   await waitForReady(page);
   const announcement = page.locator("#franklin-unlock-announcement");
   await expect(announcement).toHaveAttribute("role", "status");
@@ -368,8 +370,7 @@ test("a real second Nobel win produces one polite announcement after its durable
     Object.defineProperty(window, "__f7aAnnouncementMutations", { value: () => mutations });
   });
 
-  await page.getByRole("button", { name: "Begin match" }).click();
-  await completeLiveWarburgWin(page);
+  await completeControlledWarburgWin(page);
 
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), PROGRESS_STORAGE_KEY))

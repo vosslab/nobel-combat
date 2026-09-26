@@ -184,13 +184,16 @@ export class FighterChooser {
   }
 
   private selectVertical(direction: 1 | -1): void {
-    const current = this.choice(this.selectedId);
+    const current = this.choice(this.selectedId)?.closest<HTMLElement>(".fighter-choice");
     if (!current) return;
     const source = current.getBoundingClientRect();
     const candidates = this.options
       .availableIds()
       .filter((id) => id !== this.selectedId)
-      .map((id) => ({ id, box: this.choice(id)?.getBoundingClientRect() }))
+      .map((id) => ({
+        id,
+        box: this.choice(id)?.closest<HTMLElement>(".fighter-choice")?.getBoundingClientRect(),
+      }))
       .filter(
         (candidate): candidate is { id: FighterId; box: DOMRect } => candidate.box !== undefined,
       );
@@ -198,13 +201,17 @@ export class FighterChooser {
       direction > 0 ? candidate.box.top > source.top + 1 : candidate.box.top < source.top - 1,
     );
     if (!vertical.length) return;
-    vertical.sort((left, right) => {
+    const sameColumn = vertical.filter(
+      (candidate) => candidate.box.left < source.right && candidate.box.right > source.left,
+    );
+    const targets = sameColumn.length ? sameColumn : vertical;
+    targets.sort((left, right) => {
       const leftDistance = Math.abs(left.box.top - source.top);
       const rightDistance = Math.abs(right.box.top - source.top);
       if (leftDistance !== rightDistance) return leftDistance - rightDistance;
       return Math.abs(left.box.left - source.left) - Math.abs(right.box.left - source.left);
     });
-    this.select(vertical[0]!.id, true);
+    this.select(targets[0]!.id, true);
   }
 
   private select(id: FighterId, focus = false): void {

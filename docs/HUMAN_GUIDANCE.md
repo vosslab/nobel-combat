@@ -94,6 +94,9 @@ origin belongs there too. Rules: [REPO_STYLE.md](REPO_STYLE.md).
   high-resolution source offline when useful, but reduce the mesh before repeated color review,
   rigging, or browser capture; use bounded, vectorized diagnostics and serialize heavyweight
   offline jobs under one owner.
+- Keep generated Python bytecode visible rather than ignored. Run Python through `source_me.sh`
+  with `PYTHONDONTWRITEBYTECODE=1`, and use in-memory syntax checks instead of `py_compile` or
+  `compileall`, which write `.pyc` files by design.
 - Use Curie and Warburg as the fidelity anchor: a decent human head plus the right hair, glasses,
   age, facial-hair cues, clothing, and silhouette can make a fun, recognizable caricature. Compare
   the simplest cleaned-up donor against elaborate face work at ordinary gameplay scale before
