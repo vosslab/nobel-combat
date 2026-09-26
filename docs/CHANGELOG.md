@@ -113,14 +113,12 @@
   requires Franklin's announcement only when Franklin unlocks and permits
   other legitimate roster announcements.
 
-- Prepared one bounded Thomas Steitz doctor_m texture experiment after direct
-  atlas inspection found two face islands with locally maskable gray hair and
-  brown beard pixels. It corrects the old false claim of a native white Steitz
-  beard while preserving skin, eyes, mouth, and glasses in a source-only atlas
-  preview. A first beard-mask diagnostic missed the near-black source pixels;
-  its corrected source-only v5 preview visibly whitens the beard. It leaves
-  Warburg, assets, the manifest, and roster unchanged pending one paused
-  face-first proof.
+- Stopped the bounded Thomas Steitz `doctor_m` texture experiment after direct
+  atlas evidence rejected its beard cue. The v5 mask whitened opaque atlas
+  background; v6 preserves skin, eyes, mouth, and baked glasses but changes
+  only 234 beard-region pixels, too little to read as a white beard. The
+  source author now refuses candidate export. Warburg, assets, the manifest,
+  and roster remain unchanged.
 
 - Vendored byte-exact CC0 `male_10` as David Baker's one bounded source-only
   replacement after the native `male_6` head proof failed its curl and
